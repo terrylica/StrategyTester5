@@ -113,7 +113,7 @@ def month_bounds(dt: datetime):
 
     return start, end
 def make_tick(
-    time: datetime,
+    time: int,
     bid: float,
     ask: float,
     last: float = 0.0,
@@ -124,7 +124,9 @@ def make_tick(
     ) -> Tick:
 
     # MT5 semantics
-    time  = ensure_utc(time)
+    if isinstance(time, datetime):
+        time  = ensure_utc(time)
+        time = time.timestamp()
 
     return Tick(
         time=time,
@@ -146,12 +148,9 @@ def make_tick_from_dict(data: dict) -> Tick:
     # --- time handling ---
     time = data.get("time")
 
-    if isinstance(time, (int, float)):
-        # epoch seconds
-        time = datetime.fromtimestamp(time, tz=timezone.utc)
-
-    elif isinstance(time, datetime):
+    if isinstance(time, datetime):
         time = ensure_utc(time)
+        time = time.timestamp()
 
     else:
         raise ValueError("Tick dictionary must contain a valid 'time' field")
@@ -189,12 +188,10 @@ def make_tick_from_tuple(data: tuple) -> Tick:
     ) = data
 
     # --- time handling ---
-    if isinstance(time, (int, float)):
-        time = datetime.fromtimestamp(time, tz=timezone.utc)
-    elif isinstance(time, datetime):
+
+    if isinstance(time, datetime):
         time = ensure_utc(time)
-    else:
-        raise ValueError("Invalid time field in tick tuple")
+        time = time.timestamp()
 
     return make_tick(
         time=time,
