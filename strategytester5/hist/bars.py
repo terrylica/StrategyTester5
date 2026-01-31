@@ -87,6 +87,11 @@ def get_bars_from_mt5(
             pl.col("time").dt.month().alias("month"),
         ])
 
+        # convert the time to unix timestamps
+        df = df.with_columns(
+            pl.col("time").dt.timestamp("ms").alias("time")
+        )
+
         df.write_parquet(
             os.path.join(hist_dir, "Bars", symbol, tf_name),
             partition_by=["year", "month"],
@@ -112,8 +117,13 @@ def get_bars_from_history(
                     logger: Optional[logging.Logger] = None,
                     hist_dir: str="History") -> pl.DataFrame:
 
-    start_datetime = ensure_utc(start_datetime)
-    end_datetime   = ensure_utc(end_datetime)
+    if isinstance(start_datetime, datetime):
+        start_datetime = ensure_utc(start_datetime)
+        start_datetime = start_datetime.timestamp()
+
+    if isinstance(end_datetime, datetime):
+        end_datetime   = ensure_utc(end_datetime)
+        end_datetime = end_datetime.timestamp()
 
     if isinstance(timeframe, (int, float)):
         timeframe = TIMEFRAME2STRING_MAP[timeframe]
@@ -129,8 +139,8 @@ def get_bars_from_history(
         rates = (
             lf
             .filter(
-                (pl.col("time") >= pl.lit(start_datetime)) &
-                (pl.col("time") <= pl.lit(end_datetime))
+                (pl.col("time") >= start_datetime) &
+                (pl.col("time") <= end_datetime)
             )  # get bars between date_from and date_to
             .sort("time", descending=False)
             .select([

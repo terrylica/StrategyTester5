@@ -81,6 +81,11 @@ def get_ticks_from_mt5(which_mt5: MetaTrader5,
             pl.col("time").dt.month().alias("month"),
         ])
 
+        # convert the time to unix timestamps
+        df = df.with_columns(
+            pl.col("time").dt.timestamp("ms").alias("time")
+        )
+
         # Save monthly partitions
         df.write_parquet(
             os.path.join(hist_dir, "Ticks", symbol),
@@ -103,8 +108,13 @@ def get_ticks_from_history(
                     logger: Optional[logging.Logger] = None,
                     hist_dir: str="History") -> pl.DataFrame:
 
-    start_datetime = ensure_utc(start_datetime)
-    end_datetime   = ensure_utc(end_datetime)
+    if isinstance(start_datetime, datetime):
+        start_datetime = ensure_utc(start_datetime)
+        start_datetime = start_datetime.timestamp()
+
+    if isinstance(end_datetime, datetime):
+        end_datetime   = ensure_utc(end_datetime)
+        end_datetime = end_datetime.timestamp()
 
     guess_path = os.path.join(hist_dir, "Ticks", symbol)
     if not os.path.exists(guess_path):
@@ -113,21 +123,12 @@ def get_ticks_from_history(
 
     lf = pl.scan_parquet(guess_path)
 
-    """
-    flag_mask = (MetaTrader5.TICK_FLAG_BID 
-                 | MetaTrader5.TICK_FLAG_ASK 
-                 | MetaTrader5.TICK_FLAG_LAST
-                 | MetaTrader5.TICK_FLAG_VOLUME
-                 | MetaTrader5.TICK_FLAG_BUY 
-                 | MetaTrader5.TICK_FLAG_SELL)
-    """
-
     try:
         ticks = (
             lf
             .filter(
-                (pl.col("time") >= pl.lit(start_datetime)) &
-                (pl.col("time") <= pl.lit(end_datetime))
+                (pl.col("time") >= start_datetime) &
+                (pl.col("time") <= end_datetime)
             )  # get ticks between a date range
             # .filter((pl.col("flags") & flag_mask) != 0)
             .sort(
@@ -288,6 +289,11 @@ class TicksGen:
                     pl.col("time").dt.year().alias("year"),
                     pl.col("time").dt.month().alias("month"),
                 ])
+            )
+
+            # convert the time to unix timestamps
+            df = df.with_columns(
+                pl.col("time").dt.timestamp("ms").alias("time")
             )
 
             # Write monthly partition
