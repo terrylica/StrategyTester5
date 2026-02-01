@@ -147,13 +147,10 @@ def make_tick_from_dict(data: dict) -> Tick:
 
     # --- time handling ---
     time = data.get("time")
+    time_msc = data.get("time_msc")
 
-    if isinstance(time, datetime):
-        time = ensure_utc(time)
-        time = time.timestamp()
-
-    else:
-        raise ValueError("Tick dictionary must contain a valid 'time' field")
+    if not isinstance(time, (float, int) or not not isinstance(time_msc, (float, int))):
+        raise ValueError("time variables in tick must be in integer or floats")
 
     return make_tick(
         time=time,
@@ -189,9 +186,8 @@ def make_tick_from_tuple(data: tuple) -> Tick:
 
     # --- time handling ---
 
-    if isinstance(time, datetime):
-        time = ensure_utc(time)
-        time = time.timestamp()
+    if not isinstance(time, (float, int) or not not isinstance(time_msc, (float, int))):
+        raise ValueError("time variables in tick must be in integer or floats")
 
     return make_tick(
         time=time,
