@@ -18,81 +18,70 @@ def ticks_to_polars(ticks):
         "volume_real": ticks["volume_real"],
     })
     
-def get_ticks_from_mt5(which_mt5: MetaTrader5,
-                    start_datetime: datetime, 
+def get_ticks_from_mt5(
+                    which_mt5: MetaTrader5,
+                    start_datetime: datetime,
                     end_datetime: datetime,
                     symbol: str,
                     logger: Optional[logging.Logger] = None,
                     return_df: bool = False,
-                    hist_dir: str = "History"
-                    ) -> pl.DataFrame:
-    
+                    hist_dir: str = "History",
+                ) -> pl.DataFrame:
+
     start_datetime = ensure_utc(start_datetime)
     end_datetime   = ensure_utc(end_datetime)
 
-    current = start_datetime.replace(day=1, hour=0, minute=0, second=0)
-
+    current = start_datetime.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     dfs: list[pl.DataFrame] = []
 
     while True:
         month_start, month_end = month_bounds(current)
 
-        if (
-            month_start.year == end_datetime.year and
-            month_start.month == end_datetime.month
-        ):
+        if month_start.year == end_datetime.year and month_start.month == end_datetime.month:
             month_end = end_datetime
 
         if month_start > end_datetime:
             break
-        
+
         if logger is None:
             print(f"Processing ticks for {symbol}: {month_start:%Y-%m-%d} -> {month_end:%Y-%m-%d}")
         else:
             logger.info(f"Processing ticks for {symbol}: {month_start:%Y-%m-%d} -> {month_end:%Y-%m-%d}")
 
-        ticks = which_mt5.copy_ticks_range(
-            symbol,
-            month_start,
-            month_end,
-            which_mt5.COPY_TICKS_ALL
-        )
+        ticks = which_mt5.copy_ticks_range(symbol, month_start, month_end, which_mt5.COPY_TICKS_ALL)
 
         if ticks is None or len(ticks) == 0:
-            
             if logger is None:
                 print(f"No ticks for {symbol} {month_start:%Y-%m}")
             else:
                 logger.warning(f"No ticks for {symbol} {month_start:%Y-%m}")
-                
             current = (month_start + timedelta(days=32)).replace(day=1)
             continue
 
         df = ticks_to_polars(ticks)
 
-        df = df.with_columns(
-            pl.from_epoch("time", time_unit="s")
-                .dt.replace_time_zone("utc")
-                .alias("time")
-        )
-
+        # Ensure dtypes (MT5 already provides these, but this locks it down)
         df = df.with_columns([
-            pl.col("time").dt.year().alias("year"),
-            pl.col("time").dt.month().alias("month"),
+            pl.col("time").cast(pl.Int64),        # seconds
+            pl.col("time_msc").cast(pl.Int64),    # milliseconds
         ])
 
-        # convert the time to unix timestamps
+        # year/month derived from "time" (seconds)
         df = df.with_columns(
-            pl.col("time").dt.timestamp("ms").alias("time")
-        )
+            pl.from_epoch(pl.col("time"), time_unit="s")
+              .dt.replace_time_zone("utc")
+              .alias("time_dt")
+        ).with_columns([
+            pl.col("time_dt").dt.year().alias("year"),
+            pl.col("time_dt").dt.month().alias("month"),
+        ]).drop("time_dt")
 
-        # Save monthly partitions
         df.write_parquet(
             os.path.join(hist_dir, "Ticks", symbol),
             partition_by=["year", "month"],
             mkdir=True
         )
-        
+
         if return_df:
             dfs.append(df)
 
@@ -101,58 +90,55 @@ def get_ticks_from_mt5(which_mt5: MetaTrader5,
     return pl.concat(dfs, how="vertical") if return_df else None
 
 def get_ticks_from_history(
-                    symbol: str,
-                    start_datetime: datetime,
-                    end_datetime: datetime,
-                    POLARS_COLLECT_ENGINE: str,
-                    logger: Optional[logging.Logger] = None,
-                    hist_dir: str="History") -> pl.DataFrame:
+                        symbol: str,
+                        start_datetime: datetime,
+                        end_datetime: datetime,
+                        POLARS_COLLECT_ENGINE: str,
+                        logger: Optional[logging.Logger] = None,
+                        hist_dir: str="History",
+                    ) -> pl.DataFrame:
 
-    if isinstance(start_datetime, datetime):
-        start_datetime = ensure_utc(start_datetime)
-        start_datetime = start_datetime.timestamp()
+    if not isinstance(start_datetime, datetime) or not isinstance(end_datetime, datetime):
+        if logger: logger.critical("start_datetime and end_datetime must be datetime type")
+        return pl.DataFrame()
 
-    if isinstance(end_datetime, datetime):
-        end_datetime   = ensure_utc(end_datetime)
-        end_datetime = end_datetime.timestamp()
+    start_dt = ensure_utc(start_datetime)
+    end_dt   = ensure_utc(end_datetime)
+
+    t_from_s  = int(start_dt.timestamp())
+    t_to_s    = int(end_dt.timestamp())
+    # t_from_ms = int(start_dt.timestamp() * 1000)
+    # t_to_ms   = int(end_dt.timestamp() * 1000)
 
     guess_path = os.path.join(hist_dir, "Ticks", symbol)
     if not os.path.exists(guess_path):
-        logger.critical(f"Failed to obtain history, data path couldn't be found for {symbol}")
+        if logger: logger.critical(f"Failed to obtain history, path not found: {guess_path}")
         return pl.DataFrame()
 
     lf = pl.scan_parquet(guess_path)
 
-    try:
-        ticks = (
-            lf
-            .filter(
-                (pl.col("time") >= start_datetime) &
-                (pl.col("time") <= end_datetime)
-            )  # get ticks between a date range
-            # .filter((pl.col("flags") & flag_mask) != 0)
-            .sort(
-                ["time", "time_msc"],
-                descending=[False, False]
-            )
-            .select([
-                pl.col("time"),
-                pl.col("bid"),
-                pl.col("ask"),
-                pl.col("last"),
-                pl.col("volume"),
-                pl.col("time_msc"),
-                pl.col("flags"),
-                pl.col("volume_real"),
-            ])
-            .collect(engine=POLARS_COLLECT_ENGINE)  # the streaming engine, doesn't store data in memory
+    # coarse filter by seconds + exact by milliseconds
+    ticks_lf = (
+        lf
+        .filter(
+            (pl.col("time") >= t_from_s) &
+            (pl.col("time") <= t_to_s)
         )
+        # .filter(
+        #     (pl.col("time_msc") >= t_from_ms) &
+        #     (pl.col("time_msc") <= t_to_ms)
+        # )
+        .sort(["time", "time_msc"])
+        .select([
+            "time", "bid", "ask", "last", "volume", "time_msc", "flags", "volume_real"
+        ])
+    )
 
+    try:
+        return ticks_lf.collect(engine=POLARS_COLLECT_ENGINE)
     except Exception as e:
-        logger.warning(f"Failed to copy ticks {e}")
+        if logger: logger.warning(f"Failed to copy ticks {e}")
         return pl.DataFrame()
-
-    return ticks
     
     
 class TicksGen:
@@ -293,7 +279,7 @@ class TicksGen:
 
             # convert the time to unix timestamps
             df = df.with_columns(
-                pl.col("time").dt.timestamp("ms").alias("time")
+                (pl.col("time").dt.timestamp("ms") // 1000).cast(pl.Int64).alias("time")
             )
 
             # Write monthly partition

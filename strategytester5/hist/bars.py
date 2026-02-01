@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 import polars as pl
-from strategytester5 import MetaTrader5, ensure_utc, TIMEFRAME2STRING_MAP, month_bounds
+from strategytester5 import MetaTrader5, ensure_utc, TIMEFRAME2STRING_MAP, month_bounds, STRING2TIMEFRAME_MAP
 import os
 from typing import Optional
 import logging
@@ -29,7 +29,11 @@ def get_bars_from_mt5(
                     hist_dir: str="History",
                     return_df: bool = False
                     ) -> pl.DataFrame:
-    
+
+    if not isinstance(start_datetime, datetime) or not isinstance(end_datetime, datetime):
+        logger.critical(f"start_datetime and end_datetime must be datetime type")
+        return None
+
     start_datetime = ensure_utc(start_datetime)
     end_datetime   = ensure_utc(end_datetime)
 
@@ -37,7 +41,11 @@ def get_bars_from_mt5(
 
     dfs: list[pl.DataFrame] = []
 
-    tf_name = TIMEFRAME2STRING_MAP[timeframe]
+    if isinstance(timeframe, str):
+        str_tf = timeframe
+        timeframe = STRING2TIMEFRAME_MAP[timeframe]
+    else:
+        str_tf = TIMEFRAME2STRING_MAP[timeframe]
 
     while True:
         month_start, month_end = month_bounds(current)
@@ -52,9 +60,9 @@ def get_bars_from_mt5(
             break
 
         if logger is None:
-            print(f"\nProcessing bars for {symbol} ({tf_name}): {month_start:%Y-%m-%d} -> {month_end:%Y-%m-%d}")
+            print(f"\nProcessing bars for {symbol} ({str_tf}): {month_start:%Y-%m-%d} -> {month_end:%Y-%m-%d}")
         else:
-            logger.info(f"Processing bars for {symbol} ({tf_name}): {month_start:%Y-%m-%d} -> {month_end:%Y-%m-%d}")
+            logger.info(f"Processing bars for {symbol} ({str_tf}): {month_start:%Y-%m-%d} -> {month_end:%Y-%m-%d}")
         
 
         rates = which_mt5.copy_rates_range(
@@ -67,9 +75,9 @@ def get_bars_from_mt5(
         if rates is None:
             
             if logger is None:
-                print(f"\nNo bars for {symbol} {tf_name} {month_start:%Y-%m}")
+                print(f"\nNo bars for {symbol} {str_tf} {month_start:%Y-%m}")
             else:
-                logger.warning(f"No bars for {symbol} {tf_name} {month_start:%Y-%m}")
+                logger.warning(f"No bars for {symbol} {str_tf} {month_start:%Y-%m}")
                 
             current = (month_start + timedelta(days=32)).replace(day=1)
             continue
@@ -79,21 +87,19 @@ def get_bars_from_mt5(
         df = df.with_columns(
             pl.from_epoch("time", time_unit="s")
             .dt.replace_time_zone("utc")
-            .alias("time")
+            .alias("time_dt")
         )
 
         df = df.with_columns([
-            pl.col("time").dt.year().alias("year"),
-            pl.col("time").dt.month().alias("month"),
+            pl.col("time_dt").dt.year().alias("year"),
+            pl.col("time_dt").dt.month().alias("month"),
         ])
 
-        # convert the time to unix timestamps
-        df = df.with_columns(
-            pl.col("time").dt.timestamp("ms").alias("time")
-        )
+        # DROP datetime, keep time in seconds
+        df = df.drop("time_dt")
 
         df.write_parquet(
-            os.path.join(hist_dir, "Bars", symbol, tf_name),
+            os.path.join(hist_dir, "Bars", symbol, str_tf),
             partition_by=["year", "month"],
             mkdir=True
         )
@@ -117,13 +123,14 @@ def get_bars_from_history(
                     logger: Optional[logging.Logger] = None,
                     hist_dir: str="History") -> pl.DataFrame:
 
-    if isinstance(start_datetime, datetime):
-        start_datetime = ensure_utc(start_datetime)
-        start_datetime = start_datetime.timestamp()
+    if not isinstance(start_datetime, datetime) or not isinstance(end_datetime, datetime):
+        logger.critical(f"start_datetime and end_datetime must be datetime type")
+        return None
 
-    if isinstance(end_datetime, datetime):
-        end_datetime   = ensure_utc(end_datetime)
-        end_datetime = end_datetime.timestamp()
+    # IMPORTANT: stored time is in milliseconds
+
+    t_from_s = int(ensure_utc(start_datetime).timestamp())
+    t_to_s = int(ensure_utc(end_datetime).timestamp())
 
     if isinstance(timeframe, (int, float)):
         timeframe = TIMEFRAME2STRING_MAP[timeframe]
@@ -136,11 +143,11 @@ def get_bars_from_history(
     lf = pl.scan_parquet(guess_path)
 
     try:
-        rates = (
+        lf2 = (
             lf
             .filter(
-                (pl.col("time") >= start_datetime) &
-                (pl.col("time") <= end_datetime)
+                (pl.col("time") >= t_from_s) &
+                (pl.col("time") <= t_to_s)
             )  # get bars between date_from and date_to
             .sort("time", descending=False)
             .select([
@@ -153,11 +160,10 @@ def get_bars_from_history(
                 pl.col("spread"),
                 pl.col("real_volume"),
             ])  # return only what's required
-            .collect(engine=POLARS_COLLECT_ENGINE)  # the streaming engine, doesn't store data in memory
         )
 
     except Exception as e:
         logger.critical(f"Failed to get bars from {start_datetime} to {end_datetime} {e}")
         return pl.DataFrame()
     
-    return rates
+    return lf2.collect(engine=POLARS_COLLECT_ENGINE)

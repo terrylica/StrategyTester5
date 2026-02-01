@@ -74,7 +74,9 @@ class HistoryManager:
         """
 
         bars_obtained = self._get_bars_df(symbol=symbol, timeframe=timeframe)
-        
+
+        print(bars_obtained.head(-10))
+
         bars_info = {
             "symbol": symbol,
             "bars": bars_obtained,
