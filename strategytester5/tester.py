@@ -13,13 +13,13 @@ import polars as pl
 from strategytester5.validators.trade import TradeValidators
 from strategytester5.validators.tester_configs import TesterConfigValidators
 import strategytester5._html_templates as templates
+from strategytester5.mt5 import constants as _mt5
 from strategytester5.hist.manager import HistoryManager
-import strategytester5.mt5.importer as mt5_importer
-import strategytester5.mt5.exporter as mt5_exporter
+from strategytester5.mt5.broker_data import Importers, Exporters
 from strategytester5 import stats
 import sys
 import logging
-
+import glob
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -90,11 +90,6 @@ class StrategyTester:
         self.logger = get_logger(self.simulator_name+ ".tester" if self.IS_TESTER else ".mt5", 
                                         logfile=os.path.join(logs_dir, f"{LOG_DATE}.log"),
                                         level=logging_level)
-        
-        if not self.IS_TESTER:
-            self.logger.info("MT5 mode")
-            if not MT5_AVAILABLE:
-                no_mt5_runtime_error()
             
         # -------------- Check if we are not on the tester mode ------------------
         
@@ -102,6 +97,18 @@ class StrategyTester:
         
         if not self.IS_TESTER:
             self.logger.info("MT5 mode")
+            if not MT5_AVAILABLE:
+                no_mt5_runtime_error()
+
+            if mt5_instance is None or mt5_instance is _mt5:
+                msg = "You've chosen MetaTrader5 mode but the class doesn't seem to have a valid/initialized MetaTrader5 instance 'mt5_instance'"
+                self.logger.critical(msg)
+                raise RuntimeError(msg)
+
+        # ------------------- get symbol and account information ------------------
+
+        self.AccountInfo = None
+        self._assign_broker_info()
 
         # --------------- initialize ticks or bars data ----------------------------
         
@@ -119,9 +126,6 @@ class StrategyTester:
                                       logger=self.logger
                                       )
 
-        for symbol in self.tester_config["symbols"]:
-            self.symbol_info(symbol)
-
         self.TESTER_ALL_BARS_INFO, self.TESTER_ALL_TICKS_INFO = hist_manager.fetch_history(
             self.tester_config["modelling"],
             symbol_info_func=self.symbol_info,
@@ -131,11 +135,6 @@ class StrategyTester:
             hist_manager.synchronize_timeframes()
 
         self.logger.info("Initialized")
-
-        # ------------------- get symbol and account information ------------------
-
-        self.AccountInfo = AccountInfo
-        self._assign_broker_info()
 
         # ----------------- initialize internal containers -----------------
 
@@ -165,8 +164,10 @@ class StrategyTester:
 
             # ---- descriptive ----
             name="John Doe",
-            server="MetaTrader5-Simulator",
+            server="MetaTrader5-Simulator"
         )
+
+        self.logger.debug(f"Simulated account info: {self.AccountInfo}")
 
         self.positions_unrealized_pl = 0
         self.positions_total_margin = 0
@@ -185,98 +186,90 @@ class StrategyTester:
         self.IS_STOPPED = False
         self._engine_lock = threading.RLock()   # re-entrant lock (safe if functions call other locked functions)
 
-    def _get_acinfo_from_MT5(self) -> AccountInfo:
+    @staticmethod
+    def _to_accountinfo_namedtuple(obj) -> AccountInfo:
+        """
+        Convert MetaTrader5 AccountInfo class instance OR dict OR our AccountInfo into our AccountInfo namedtuple.
+        """
+        # already our namedtuple
+        if isinstance(obj, AccountInfo):
+            return obj
 
-        ac_info = self.mt5_instance.account_info()
-        if ac_info is None:
-            msg = f"Failed to get account info. MT5 Error = {self.mt5_instance.last_error()}"
-            self.logger.critical(msg)
-            raise RuntimeError(msg)
+        # dict -> namedtuple
+        if isinstance(obj, dict):
+            return AccountInfo(**obj)
 
-        return ac_info
-
-    def _get_allsymbolinfo_from_MT5(self) -> tuple:
-
-        info = self.mt5_instance.symbols_get()
-        if info is None:
-            msg = f"Failed to get all symbol information from MT5. Error = {self.mt5_instance.last_error()}"
-            self.logger.critical(msg)
-            raise RuntimeError(msg)
-
-        return info
+        # MT5 class instance -> namedtuple via getattr
+        return AccountInfo(**{f: getattr(obj, f, None) for f in AccountInfo._fields})
 
     def _assign_broker_info(self):
+
         symbols = list(self.tester_config.get("symbols", []))
         requested = set(symbols)
 
         # ----------- account info ----------
+        ac_info = None
 
         if self.IS_TESTER:
-            self.AccountInfo = mt5_importer.account_info(self.broker_data_dir, self.logger)
+            # On the strategy tester mode, we import everything from a broker path
 
-            if not self.AccountInfo: # empty named tuple
+            data_importer = Importers(broker_path=self.broker_data_dir, logger=self.logger)
+
+            ac_info = data_importer.account_info()
+            all_symbol_info = data_importer.all_symbol_info()
+
+            if not ac_info:
+                self.logger.warning(f"Failed to get account info from {self.broker_data_dir}.")
+
                 if MT5_AVAILABLE:
-                    self.logger.warning("Falling back to MT5 for account info")
-                    self.AccountInfo = self._get_acinfo_from_MT5()
+                    self.logger.info("Falling back to MT5 for account info")
+                    ac_info = self.mt5_instance.account_info()
+                    if not ac_info:
+                        err = f"Failed to get account info from MetaTrader5 as well. Error = {self.mt5_instance.last_error()}"
+                        hint = "Assign a valid/initialized MetaTrader5 instance to this class using 'mt5_instance'"
 
-                    mt5_exporter.account_info(self.mt5_instance, self.broker_data_dir)
+                        self.logger.critical(err)
+                        self.logger.critical(hint)
+                        raise RuntimeError(err)
 
-            if not self.broker_data_dir:
-                self.broker_data_dir = self.AccountInfo.server
+            if not all_symbol_info:
+                self.logger.warning(f"Failed to get symbol info from {self.broker_data_dir}.")
+
+                if MT5_AVAILABLE:
+                    self.logger.info("Falling back to MT5 for symbol info")
+                    all_symbol_info = self.mt5_instance.symbols_get()
+                    if not all_symbol_info:
+                        err = f"Failed to get symbol info from MetaTrader5 as well. Error = {self.mt5_instance.last_error()}"
+                        hint = "Assign a valid/initialized MetaTrader5 instance to this class using 'mt5_instance'"
+
+                        self.logger.critical(err)
+                        self.logger.critical(hint)
+                        raise RuntimeError(err)
 
         else:
             if not MT5_AVAILABLE:
                 no_mt5_runtime_error()
 
-            self.AccountInfo = self._get_acinfo_from_MT5()
+            ac_info = self.mt5_instance.account_info()
+            all_symbol_info = self.mt5_instance.symbols_get()
 
-        # ------------- symbol info --------------------
+            if not ac_info or not all_symbol_info: # if either of the information isn't found terminate the program
+                raise RuntimeError(f"Failed to get symbol or account info from a MetaTrader5 broker.")
 
-        invalid = []
-        self.symbol_info_cache = {}
+        self.AccountInfo = StrategyTester._to_accountinfo_namedtuple(ac_info)
+        for info in all_symbol_info:
+            name = info.name
 
-        if self.IS_TESTER:
-            # If this returns “all symbols”, filter down to only requested ones
-            all_info = mt5_importer.all_symbol_info(self.broker_data_dir, self.logger)
-
-            if not all_info: # all symbol information wasn't received
-                if MT5_AVAILABLE:
-                    self.logger.warning("Falling back to MT5 for all symbols information")
-
-                    all_info = self._get_allsymbolinfo_from_MT5()
-                    mt5_exporter.all_symbol_info(self.mt5_instance, self.broker_data_dir)
-
-            for info in all_info:
-                name = getattr(info, "name", None)
-                if not name or name not in requested:
-                    continue
-
+            if name in symbols:
                 self.symbol_info_cache[name] = info
 
-                if len(self.symbol_info_cache) == len(requested):
-                    break
+        # Export broker's data
 
-            # figure out which requested symbols weren’t found
-            missing = requested - set(self.symbol_info_cache.keys())
-            for sym in missing:
-                self.logger.warning(f"Missing symbol info for requested symbol: {sym}")
-                invalid.append(sym)
+        if self.broker_data_dir is not None: # a name is given fo the path
+            data_exporter = Exporters(broker_path=self.broker_data_dir, logger=self.logger)
 
-        else:
-            for sym in symbols:
-                info = self.mt5_instance.symbol_info(sym)
-                if info is None:
-                    self.logger.warning(
-                        f"Failed to get symbol info for {sym}. MT5 Error = {self.mt5_instance.last_error()}"
-                    )
-                    invalid.append(sym)
-                    continue
-
-                self.symbol_info_cache[sym] = info
-
-        # Remove invalid symbols from config (after loops)
-        if invalid:
-            self.tester_config["symbols"] = [s for s in symbols if s not in set(invalid)]
+            data_exporter.account_info(ac_info=ac_info)
+            data_exporter.all_symbol_info(all_symbol_info=all_symbol_info)
 
     def account_info(self) -> AccountInfo:
         """Gets info on the current trading account."""
@@ -367,10 +360,16 @@ class StrategyTester:
 
             # instead of getting data from MetaTrader 5, get data stored in our custom directories
 
-            path = os.path.join(self.history_dir, "Bars", symbol, TIMEFRAME2STRING_MAP[timeframe])
-            os.makedirs(path, exist_ok=True)
+            str_timeframe = TIMEFRAME2STRING_MAP[timeframe]
 
-            lf = pl.scan_parquet(path)
+            pattern = os.path.join(self.history_dir, "Bars", symbol, "**", "*.parquet")
+            files = glob.glob(pattern, recursive=True)
+
+            if not files:
+                self.logger.warning(f"Failed, No history is found for {symbol} and {str_timeframe}")
+                return None
+
+            lf = pl.scan_parquet(files)
 
             try:
                 rates = (
@@ -398,7 +397,7 @@ class StrategyTester:
 
             except Exception as e:
                 self.logger.warning(f"Failed to copy rates from {date_from} to {date_to} {e}")
-                return np.array(dict())
+                return None
         else:
 
             rates = self.mt5_instance.copy_rates_range(symbol, timeframe, date_from, date_to)
@@ -406,7 +405,7 @@ class StrategyTester:
 
             if rates is None:
                 self.logger.warning(f"Failed to copy rates. MetaTrader 5 error = {self.mt5_instance.last_error()}")
-                return np.array(dict())
+                return None
 
         return rates
 
@@ -426,7 +425,6 @@ class StrategyTester:
         """
 
         date_from = ensure_utc(date_from)
-        rates = np.array(dict())
 
         if self.IS_TESTER:
 
@@ -435,17 +433,19 @@ class StrategyTester:
             date_to = date_from + timedelta(seconds=PeriodSeconds(timeframe) * count)
             rates = self.copy_rates_range(symbol=symbol, timeframe=timeframe, date_from=date_from, date_to=date_to)
 
-            if len(rates) == 0:
+            if rates is None or len(rates) == 0:
                 self.logger.warning(f"Failed to to copy {count} bars from {date_from}")
+                return None
 
         else:
 
             rates = self.mt5_instance.copy_rates_from(symbol, timeframe, date_from, count)
-            rates = np.array(self.__mt5_data_to_dicts(rates))
 
             if rates is None:
                 self.logger.warning(f"Failed to copy rates. MetaTrader 5 error = {self.mt5_instance.last_error()}")
-                return np.array(dict())
+                return None
+
+            rates = np.array(self.__mt5_data_to_dicts(rates))
 
         return rates
 
@@ -466,11 +466,8 @@ class StrategyTester:
 
         tick = self.symbol_info_tick(symbol=symbol)
 
-        if tick is None:
-            self.logger.critical(
-                "Time information not found in the ticker, call the function 'TickUpdate' giving it the latest tick information"
-            )
-
+        if not tick:
+            self.logger.critical("Time information not found in the ticker, call the function 'TickUpdate' giving it the latest tick information")
             return None
 
         if self.IS_TESTER:
@@ -482,14 +479,11 @@ class StrategyTester:
                 date_from = datetime.fromtimestamp(now)
 
             date_from += timedelta(seconds=PeriodSeconds(timeframe) * start_pos)
+            rates = self.copy_rates_from(symbol=symbol, timeframe=timeframe, date_from=date_from, count=count)
 
-            rates = self.copy_rates_from(symbol=symbol,
-                                         timeframe=timeframe,
-                                         date_from=date_from,
-                                         count=count)
-
-            if len(rates) == 0:
+            if rates is None or len(rates) == 0:
                 self.logger.warning(f"no rates found from {date_from} bars: count")
+                return None
         else:
 
             rates = self.mt5_instance.copy_rates_from_pos(symbol, timeframe, start_pos, count)
@@ -540,8 +534,14 @@ class StrategyTester:
 
         if self.IS_TESTER:    
             
-            path = os.path.join(self.history_dir, "Ticks", symbol)
-            lf = pl.scan_parquet(path)
+            pattern = os.path.join(self.history_dir, "Ticks", symbol, "**", "*.parquet")
+            files = glob.glob(pattern, recursive=True)
+
+            if not files:
+                self.logger.warning(f"Failed, no history is found for {symbol}")
+                return None
+
+            lf = pl.scan_parquet(files)
 
             try:
                 ticks = (
@@ -605,11 +605,15 @@ class StrategyTester:
         flag_mask = self.__tick_flag_mask(flags)
 
         if self.IS_TESTER:    
-            
-            path = os.path.join(self.history_dir, "Ticks", symbol)
-            os.makedirs(path, exist_ok=True)
-            
-            lf = pl.scan_parquet(path)
+
+            pattern = os.path.join(self.history_dir, "Ticks", symbol, "**", "*.parquet")
+            files = glob.glob(pattern, recursive=True)
+
+            if not files:
+                self.logger.warning(f"Failed, no history is found for {symbol}")
+                return None
+
+            lf = pl.scan_parquet(files)
 
             try:
                 ticks = (
@@ -651,13 +655,13 @@ class StrategyTester:
                 return None
             
         return ticks
-    
 
     def orders_total(self) -> int:
         
         """Get the number of active orders.
         
-        Returns (int): The number of active orders in either a simulator or MetaTrader 5
+        Returns (int): The number of active orders in either a simulator or MetaTrader 5, or
+                        returns a negative number if there was an error getting the value
         """
         
         if self.IS_TESTER:
@@ -1096,14 +1100,18 @@ class StrategyTester:
         """
 
         # -----------------------------------------------------
-        
+
         if not self.IS_TESTER:
+            return
+
+            """
             result = self.mt5_instance.order_send(request)
             if result is None or result.retcode != self.mt5_instance.TRADE_RETCODE_DONE:
                 self.logger.warning(f"MT5 failed: {error_description.trade_server_return_code_description(self.mt5_instance.last_error()[0])}")
                 return None
             return result
-        
+            """
+
         # -------------------- Extract request -----------------------------
         
         action     = request.get("action")
@@ -1977,13 +1985,13 @@ class StrategyTester:
         modelling = self.tester_config["modelling"]
         if modelling == "real_ticks" or modelling == "every_tick":
 
-            total_ticks = sum(ticks_info["size"] for ticks_info in self.TESTER_ALL_TICKS_INFO)
+            total_ticks = sum(ticks_info["size"] if ticks_info else 0 for ticks_info in self.TESTER_ALL_TICKS_INFO)
 
             self.logger.debug(f"total number of ticks: {total_ticks}")
             self.__TesterInit(size=total_ticks)
 
             with tqdm(total=total_ticks, desc="StrategyTester Progress", unit="tick") as pbar:
-                while True:
+                while True and total_ticks>0:
 
                     self.__positions_monitoring()
                     self.__account_monitoring()
@@ -2037,7 +2045,7 @@ class StrategyTester:
             self.__TesterInit(size=total_bars)
 
             with tqdm(total=total_bars, desc="StrategyTester Progress", unit="bar") as pbar:
-                while True:
+                while True and total_bars > 0:
 
                     self.__positions_monitoring()
                     self.__account_monitoring()
@@ -2201,7 +2209,7 @@ class StrategyTester:
             size = sum(bars_info["size"] for bars_info in self.TESTER_ALL_BARS_INFO)
 
         if modelling in ("real_ticks", "every_tick"):
-            size = sum(ticks_info["size"] for ticks_info in self.TESTER_ALL_TICKS_INFO)
+            size = sum(ticks_info["size"] if ticks_info else 0 for ticks_info in self.TESTER_ALL_TICKS_INFO)
 
         self.__TesterInit(size=size)
 
