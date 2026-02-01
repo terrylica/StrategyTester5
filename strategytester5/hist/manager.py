@@ -101,29 +101,17 @@ class HistoryManager:
                 logger=self.logger,
                 hist_dir=self.history_dir
             )
+        else:
+            ticks_obtained = ticks.get_ticks_from_mt5(
+                which_mt5=self.mt5_instance,
+                start_datetime=self.start_dt,
+                end_datetime=self.end_dt,
+                symbol=symbol,
+                return_df=return_df,
+                logger=self.logger,
+                hist_dir=self.history_dir
+            )
 
-            ticks_info = {
-                "symbol": symbol,
-                "ticks": ticks_obtained,
-                "size": ticks_obtained.height,
-                "counter": 0
-            }
-
-            if not ticks_obtained.is_empty():
-                return ticks_info if return_df else {}
-
-        # if a user selected history mode but, the process failed we forcefully attempt to obtain data from MT5 regardlessly
-
-        ticks_obtained = ticks.get_ticks_from_mt5(
-            which_mt5=self.mt5_instance,
-            start_datetime=self.start_dt,
-            end_datetime=self.end_dt,
-            symbol=symbol,
-            return_df=return_df,
-            logger=self.logger,
-            hist_dir=self.history_dir
-        )
-        
         ticks_info = {
             "symbol": symbol,
             "ticks": ticks_obtained,
@@ -131,7 +119,11 @@ class HistoryManager:
             "counter": 0
         }
 
-        return ticks_info if return_df else {}
+        if ticks_obtained is None or ticks_obtained.is_empty():
+            self.__critical_log("Empty ticks were returned")
+            return {}
+
+        return ticks_info
 
     def _get_bars_df(self, symbol: str, timeframe: int) -> pl.DataFrame:
 
@@ -155,6 +147,7 @@ class HistoryManager:
             end_datetime=self.end_dt,
             logger=self.logger,
             hist_dir=self.history_dir,
+            return_df=True,
         )
 
 
@@ -168,7 +161,8 @@ class HistoryManager:
 
         one_minute_bars = self._get_bars_df(symbol=symbol, timeframe=MetaTrader5.TIMEFRAME_M1)
 
-        if one_minute_bars.is_empty():
+        if one_minute_bars is None or one_minute_bars.is_empty():
+            self.__critical_log("Empty one minute bars dataframe received.")
             return {}
 
         ticks_df = ticks.TicksGen.generate_ticks_from_bars(
@@ -177,7 +171,7 @@ class HistoryManager:
             symbol_point=symbol_points,
             logger=self.logger,
             hist_dir=self.history_dir,
-            return_df=True
+            return_df=return_df
         )
 
         ticks_info = {
@@ -187,7 +181,7 @@ class HistoryManager:
             "counter": 0
         }
 
-        return ticks_info if return_df else {}
+        return ticks_info
 
     def fetch_history(self, modelling: str, symbol_info_func: any):
         """Fetch bars or ticks for all symbols according to the modelling mode.
@@ -238,6 +232,14 @@ class HistoryManager:
 
             total_ticks = sum(info["size"] if info else 0 for info in all_ticks_info)
             self.__info_log(f"Total ticks generated: {total_ticks} in {(time.time()-start_time):.2f} seconds.")
+            if total_ticks == 0:
+                err = f"Failed to generate ticks for all symbols."
+                if self.mt5_source:
+                    err += "Could be due to a wrong assigned MetaTrader5 to the StrategyTester, 'mt5_instance'"
+                else:
+                    err += f"Could be due to the lack of History in the specified folders, call the tester in MT5 mode instead."
+                self.__critical_log(err)
+                raise RuntimeError(err)
 
         elif modelling in ("new_bar", "1-minute-ohlc"):
             
