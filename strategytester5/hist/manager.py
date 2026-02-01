@@ -75,8 +75,6 @@ class HistoryManager:
 
         bars_obtained = self._get_bars_df(symbol=symbol, timeframe=timeframe)
 
-        print(bars_obtained.head(-10))
-
         bars_info = {
             "symbol": symbol,
             "bars": bars_obtained,
@@ -141,18 +139,18 @@ class HistoryManager:
 
             return bars.get_bars_from_history(
                 symbol=symbol,
-                timeframe=STRING2TIMEFRAME_MAP[timeframe] if isinstance(timeframe, str) else timeframe,
+                timeframe=timeframe,
                 start_datetime=self.start_dt,
                 end_datetime=self.end_dt,
+                POLARS_COLLECT_ENGINE=self.POLARS_COLLECT_ENGINE,
                 logger=self.logger,
-                hist_dir=self.history_dir,
-                POLARS_COLLECT_ENGINE=self.POLARS_COLLECT_ENGINE
+                hist_dir=self.history_dir
             )
 
         return bars.get_bars_from_mt5(
             which_mt5=self.mt5_instance,
             symbol=symbol,
-            timeframe=STRING2TIMEFRAME_MAP[timeframe] if isinstance(timeframe, str) else timeframe,
+            timeframe=timeframe,
             start_datetime=self.start_dt,
             end_datetime=self.end_dt,
             logger=self.logger,
@@ -220,7 +218,7 @@ class HistoryManager:
                     except Exception as e:
                         self.__critical_log(f"Failed to fetch real ticks for {sym}: {e!r}")
 
-            total_ticks = sum(info["size"] for info in all_ticks_info)
+            total_ticks = sum(info["size"] if info else 0 for info in all_ticks_info)
             self.__info_log(f"Total real ticks collected: {total_ticks} in {(time.time()-start_time):.2f} seconds.")
 
         elif modelling == "every_tick":
@@ -238,7 +236,7 @@ class HistoryManager:
                     except Exception as e:
                         self.__critical_log(f"Failed to generate ticks for {sym}: {e!r}")
 
-            total_ticks = sum(info["size"] for info in all_ticks_info)
+            total_ticks = sum(info["size"] if info else 0 for info in all_ticks_info)
             self.__info_log(f"Total ticks generated: {total_ticks} in {(time.time()-start_time):.2f} seconds.")
 
         elif modelling in ("new_bar", "1-minute-ohlc"):
@@ -257,7 +255,7 @@ class HistoryManager:
                     except Exception as e:
                         self.__critical_log(f"Failed to fetch bars for {sym}: {e!r}")
 
-            total_bars = sum(info["size"] for info in all_bars_info)
+            total_bars = sum(info["size"] if info else 0 for info in all_bars_info)
             self.__info_log(f"Total bars collected: {total_bars} from '{TIMEFRAME2STRING_MAP[tf]}' timeframe in {(time.time()-start_time):.2f} seconds.")
             
         return all_bars_info, all_ticks_info

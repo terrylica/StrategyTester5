@@ -167,9 +167,11 @@ class TicksGen:
     @staticmethod
     def generate_ticks_from_bar(bar: dict, symbol_point: float):
         tick_count = TicksGen.__resolve_tick_count(bar)
-        spread = bar["spread"]
 
-        base_msc = int(bar["time"].timestamp() * 1000)
+        time = int(bar["time"])
+        spread = bar["spread"]
+        base_msc = time * 1000
+
         step = max(1, 1000 // tick_count)
 
         ticks = []
@@ -179,7 +181,7 @@ class TicksGen:
             price = bar["close"]
             return [
                 make_tick(
-                    bar["time"],
+                    time,
                     price,
                     price + spread * symbol_point,
                     time_msc=base_msc
@@ -221,26 +223,32 @@ class TicksGen:
 
     @staticmethod
     def generate_ticks_from_bars(
-        bars: pl.DataFrame,
-        symbol: str,
-        symbol_point: float,
-        logger: Optional[logging.Logger] = None,
-        hist_dir: str="History",
-        return_df: bool = False,
+            bars: pl.DataFrame,
+            symbol: str,
+            symbol_point: float,
+            logger: Optional[logging.Logger] = None,
+            hist_dir: str = "History",
+            return_df: bool = False,
     ) -> pl.DataFrame:
 
         dfs: list[pl.DataFrame] = []
 
-        # Ensure sorted (important!)
-        bars = bars.sort("time")
+        # bars.time is seconds int -> add time_dt for partitions
+        df_bars = (
+            bars
+            .with_columns(
+                pl.from_epoch(pl.col("time").cast(pl.Int64), time_unit="s")
+                .dt.replace_time_zone("utc")
+                .alias("time_dt")
+            )
+            .with_columns([
+                pl.col("time_dt").dt.year().alias("year"),
+                pl.col("time_dt").dt.month().alias("month"),
+            ])
+            .sort("time")
+        )
 
-        # Add year/month once
-        bars = bars.with_columns([
-            pl.col("time").dt.year().alias("year"),
-            pl.col("time").dt.month().alias("month"),
-        ])
-
-        for (year, month), bars_chunk in bars.group_by(["year", "month"], maintain_order=True):
+        for (year, month), bars_chunk in df_bars.group_by(["year", "month"], maintain_order=True):
 
             if logger is None:
                 print(f"\nGenerating ticks for {symbol}: {year}-{month:02d}")
@@ -248,7 +256,6 @@ class TicksGen:
                 logger.info(f"Generating ticks for {symbol}: {year}-{month:02d}")
 
             tick_rows = []
-
             for bar in bars_chunk.iter_rows(named=True):
                 ticks = TicksGen.generate_ticks_from_bar(bar, symbol_point)
                 if ticks:
@@ -257,40 +264,45 @@ class TicksGen:
             if not tick_rows:
                 continue
 
-            df = (
-                pl.DataFrame(
-                    tick_rows,
-                    schema={
-                        "time": pl.Datetime("us", time_zone="UTC"),
-                        "bid": pl.Float64,
-                        "ask": pl.Float64,
-                        "last": pl.Float64,
-                        "volume": pl.UInt64,
-                        "time_msc": pl.Int64,
-                        "flags": pl.Int8,
-                        "volume_real": pl.UInt64,
-                    },
+            df_ticks = pl.DataFrame(tick_rows)
+
+            # --- normalize schema to MT5-style ---
+            # time -> seconds int64
+            if df_ticks.schema.get("time") in (pl.Datetime, pl.Datetime("us", time_zone="UTC"), pl.Datetime("ms"),
+                                               pl.Datetime("ns")):
+                df_ticks = df_ticks.with_columns(
+                    (pl.col("time").dt.timestamp("ms") // 1000).cast(pl.Int64).alias("time")
+                )
+            else:
+                df_ticks = df_ticks.with_columns(pl.col("time").cast(pl.Int64))
+
+            # time_msc -> int64 ms
+            df_ticks = df_ticks.with_columns(pl.col("time_msc").cast(pl.Int64))
+
+            # year/month from seconds
+            df_ticks = (
+                df_ticks
+                .with_columns(
+                    pl.from_epoch(pl.col("time"), time_unit="s")
+                    .dt.replace_time_zone("utc")
+                    .alias("time_dt")
                 )
                 .with_columns([
-                    pl.col("time").dt.year().alias("year"),
-                    pl.col("time").dt.month().alias("month"),
+                    pl.col("time_dt").dt.year().alias("year"),
+                    pl.col("time_dt").dt.month().alias("month"),
                 ])
+                .drop("time_dt")
+                .sort(["time", "time_msc"])
             )
 
-            # convert the time to unix timestamps
-            df = df.with_columns(
-                (pl.col("time").dt.timestamp("ms") // 1000).cast(pl.Int64).alias("time")
-            )
-
-            # Write monthly partition
-            df.write_parquet(
+            df_ticks.write_parquet(
                 os.path.join(hist_dir, "Simulated Ticks", symbol),
                 partition_by=["year", "month"],
                 mkdir=True,
             )
 
             if return_df:
-                dfs.append(df)
+                dfs.append(df_ticks)
 
         return pl.concat(dfs, how="vertical") if return_df else None
 
