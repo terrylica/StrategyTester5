@@ -112,6 +112,7 @@ def month_bounds(dt: datetime):
     end = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
 
     return start, end
+
 def make_tick(
     time: int,
     bid: float,
