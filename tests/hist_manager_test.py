@@ -2,7 +2,7 @@ from strategytester5.hist.manager import HistoryManager
 from strategytester5.validators.tester_configs import TesterConfigValidators
 from strategytester5 import get_logger, logging, STRING2TIMEFRAME_MAP
 
-history_dir = "Test History"
+history_dir = r'D:\StrategyTester5\examples\simple trading bot\History'
     
 if __name__ == "__main__":
 
@@ -11,9 +11,9 @@ if __name__ == "__main__":
         "deposit": 1000,
         "leverage": "1:100",
         "timeframe": "H1",
-        "start_date": "01.01.2025 00:00",
+        "start_date": "01.12.2025 00:00",
         "end_date": "31.12.2025 00:00",
-        "modelling": "1-minute-ohlc",
+        "modelling": "every_tick",
         # "modelling": "new_bar",
         "symbols": ["EURUSD", "GBPUSD", "USDCAD"]
     }
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
 
     import MetaTrader5 as mt5
-    
+
 
     if not mt5.initialize():
         print("Failed to initialize MetaTrader5, Error = ", mt5.last_error())
@@ -41,17 +41,18 @@ if __name__ == "__main__":
                          logfile= f"test.log",
                          level=logging.DEBUG)
 
-    history_dir = r'D:\StrategyTester5\examples\multicurrency trading bot\History'
-    ticks_df = ticks.get_ticks_from_history(
+    bars_df = bars.get_bars_from_mt5(
+        which_mt5=mt5,
         symbol=symbols[0],
+        timeframe=timeframe,
         start_datetime=start_dt,
         end_datetime=end_dt,
-        POLARS_COLLECT_ENGINE="auto",
         logger=logger,
-        hist_dir=history_dir
+        hist_dir=history_dir,
+        return_df=True
     )
 
-    print(ticks_df.head(-10))
+    print("Bars from MT5\n",bars_df.head(-10))
 
     bars_df = bars.get_bars_from_history(
         symbol=symbols[0],
@@ -63,15 +64,30 @@ if __name__ == "__main__":
         hist_dir=history_dir
     )
 
-    print(bars_df.head(-10))
+    print("Bars from History\n", bars_df.head(-10))
 
-    """
-    hist_manager = HistoryManager(mt5_instance=mt5,
-                                start_dt=start_dt,
-                                end_dt=end_dt,
-                                symbols=symbols,
-                                timeframe=timeframe)
 
-    hist_manager.fetch_history(modelling=modelling)
-    hist_manager.synchronize_timeframes()
-    """
+    # --------------------------- ticks -----------------------------
+
+    ticks_df = ticks.get_ticks_from_mt5(
+        which_mt5=mt5,
+        symbol=symbols[0],
+        start_datetime=start_dt,
+        end_datetime=end_dt,
+        logger=logger,
+        hist_dir=history_dir,
+        return_df=True
+    )
+
+    print("Ticks from MT5\n",ticks_df.head(-10))
+
+    ticks_df = ticks.get_ticks_from_history(
+        symbol=symbols[0],
+        start_datetime=start_dt,
+        end_datetime=end_dt,
+        POLARS_COLLECT_ENGINE="auto",
+        logger=logger,
+        hist_dir=history_dir
+    )
+
+    print("Ticks from History\n", ticks_df.head(-10))
