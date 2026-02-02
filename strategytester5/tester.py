@@ -2,7 +2,6 @@ import inspect
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from strategytester5 import *
-from strategytester5 import error_description
 from datetime import datetime, timedelta
 import secrets
 import os
@@ -205,7 +204,6 @@ class StrategyTester:
     def _assign_broker_info(self):
 
         symbols = list(self.tester_config.get("symbols", []))
-        requested = set(symbols)
 
         # ----------- account info ----------
         ac_info = None
@@ -353,8 +351,10 @@ class StrategyTester:
                 Returns bars as the numpy array with the named time, open, high, low, close, tick_volume, spread and real_volume columns. Returns None in case of an error. The info on the error can be obtained using MetaTrader5.last_error().
         """
 
-        date_from = ensure_utc(date_from)
-        date_to = ensure_utc(date_to)
+        if isinstance(date_from, (int, float)):
+            date_from = datetime.fromtimestamp(date_from, tz=timezone.utc)
+        if isinstance(date_to, (int, float)):
+            date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
 
         if self.IS_TESTER:
 
@@ -375,8 +375,8 @@ class StrategyTester:
                 rates = (
                     lf
                     .filter(
-                            (pl.col("time") >= pl.lit(date_from)) &
-                            (pl.col("time") <= pl.lit(date_to))
+                            (pl.col("time") >= date_from) &
+                            (pl.col("time") <= date_to)
                         ) # get bars between date_from and date_to
                     .sort("time", descending=True)
                     .select([
@@ -396,7 +396,7 @@ class StrategyTester:
                 rates = np.array(rates)[::-1] # reverse an array so it becomes oldest -> newest
 
             except Exception as e:
-                self.logger.warning(f"Failed to copy rates from {date_from} to {date_to} {e}")
+                self.logger.warning(f"Failed to copy rates for {symbol} from {date_from} to {date_to} {e}")
                 return None
         else:
 
@@ -424,7 +424,8 @@ class StrategyTester:
             Returns bars as the numpy array with the named time, open, high, low, close, tick_volume, spread and real_volume columns. Return None in case of an error. The info on the error can be obtained using last_error().
         """
 
-        date_from = ensure_utc(date_from)
+        if isinstance(date_from, (int, float)):
+            date_from = datetime.fromtimestamp(date_from, tz=timezone.utc)
 
         if self.IS_TESTER:
 
@@ -434,7 +435,7 @@ class StrategyTester:
             rates = self.copy_rates_range(symbol=symbol, timeframe=timeframe, date_from=date_from, date_to=date_to)
 
             if rates is None or len(rates) == 0:
-                self.logger.warning(f"Failed to to copy {count} bars from {date_from}")
+                self.logger.warning(f"no rates found for {symbol} from {date_from} bars: {count}")
                 return None
 
         else:
@@ -467,7 +468,7 @@ class StrategyTester:
         tick = self.symbol_info_tick(symbol=symbol)
 
         if not tick:
-            self.logger.critical("Time information not found in the ticker, call the function 'TickUpdate' giving it the latest tick information")
+            self.logger.critical(f"Time information not found in the ticker for {symbol}, call the function 'TickUpdate' giving it the latest tick information")
             return None
 
         if self.IS_TESTER:
@@ -482,7 +483,7 @@ class StrategyTester:
             rates = self.copy_rates_from(symbol=symbol, timeframe=timeframe, date_from=date_from, count=count)
 
             if rates is None or len(rates) == 0:
-                self.logger.warning(f"no rates found from {date_from} bars: count")
+                self.logger.warning(f"no rates found for {symbol} from {start_pos} bars: {count}")
                 return None
         else:
 
@@ -528,8 +529,10 @@ class StrategyTester:
         Returns:
             Returns ticks as the numpy array with the named time, bid, ask, last and flags columns. The 'flags' value can be a combination of flags from the TICK_FLAG enumeration. Return None in case of an error. The info on the error can be obtained using last_error().
         """
-        
-        date_from = ensure_utc(date_from)
+
+        if isinstance(date_from, (int, float)):
+            date_from = datetime.fromtimestamp(date_from, tz=timezone.utc)
+
         flag_mask = self.__tick_flag_mask(flags)
 
         if self.IS_TESTER:    
@@ -546,7 +549,7 @@ class StrategyTester:
             try:
                 ticks = (
                     lf
-                    .filter(pl.col("time") >= pl.lit(date_from)) # get data starting at the given date
+                    .filter(pl.col("time") >= date_from) # get data starting at the given date
                     .filter((pl.col("flags") & flag_mask) != 0)
                     .sort(
                         ["time", "time_msc"],
@@ -598,10 +601,12 @@ class StrategyTester:
         Returns:
             Returns ticks as the numpy array with the named time, bid, ask, last and flags columns. The 'flags' value can be a combination of flags from the TICK_FLAG enumeration. Return None in case of an error. The info on the error can be obtained using last_error().
         """
-        
-        date_from = ensure_utc(date_from)
-        date_to = ensure_utc(date_to)
-        
+
+        if isinstance(date_from, (int, float)):
+            date_from = datetime.fromtimestamp(date_from, tz=timezone.utc)
+        if isinstance(date_to, (int, float)):
+            date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
+
         flag_mask = self.__tick_flag_mask(flags)
 
         if self.IS_TESTER:    
@@ -619,8 +624,8 @@ class StrategyTester:
                 ticks = (
                     lf
                     .filter(
-                            (pl.col("time") >= pl.lit(date_from)) &
-                            (pl.col("time") <= pl.lit(date_to))
+                            (pl.col("time") >= date_from) &
+                            (pl.col("time") <= date_to)
                         ) # get ticks between date_from and date_to
                     .filter((pl.col("flags") & flag_mask) != 0)
                     .sort(
@@ -799,11 +804,8 @@ class StrategyTester:
 
     def history_orders_total(self, date_from: datetime, date_to: datetime) -> int:
         
-        # date range is a requirement
-        
-        if date_from is None or date_to is None:
-            self.logger.error("date_from and date_to must be specified")
-            return None
+        if not isinstance(date_from, datetime) or not isinstance(date_to, datetime):
+            raise ValueError("date_from and date_to must be specified")
             
         date_from = ensure_utc(date_from)
         date_to = ensure_utc(date_to)
@@ -834,6 +836,9 @@ class StrategyTester:
                            ticket: Optional[int] = None,
                            position: Optional[int] = None
                            ) -> tuple[TradeOrder]:
+        
+        if not isinstance(date_from, datetime) or not isinstance(date_to, datetime):
+            raise ValueError("date_from and date_to must be specified")
         
         if self.IS_TESTER:
 
@@ -907,12 +912,10 @@ class StrategyTester:
             An integer value.
         """
 
-        if date_from is None or date_to is None:
-            self.logger.error("date_from and date_to must be specified")
-            return -1
-
-        date_from = ensure_utc(date_from)
-        date_to   = ensure_utc(date_to)
+        if isinstance(date_from, (int, float)):
+            date_from = datetime.fromtimestamp(date_from, tz=timezone.utc)
+        if isinstance(date_to, (int, float)):
+            date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
 
         if self.IS_TESTER:
 
@@ -958,7 +961,12 @@ class StrategyTester:
         Returns:
             tuple[TradeDeal]: information about deals
         """
-                
+
+        if isinstance(date_from, (int, float)):
+            date_from = datetime.fromtimestamp(date_from, tz=timezone.utc)
+        if isinstance(date_to, (int, float)):
+            date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
+
         if self.IS_TESTER:
 
             deals = self.__deals_history_container__
@@ -1003,9 +1011,6 @@ class StrategyTester:
 
             if date_from is None or date_to is None:
                 raise ValueError("date_from and date_to are required")
-
-            date_from = ensure_utc(date_from)
-            date_to   = ensure_utc(date_to)
 
             if group is not None:
                 return self.mt5_instance.history_deals_get(
