@@ -264,6 +264,10 @@ class HistoryManager:
 
     def synchronize_timeframes(self):
 
+        # synchronize by collecting data to the respective folders only if we are using the MetaTrader5 data source
+        if not self.mt5_source:
+            return
+
         all_tfs = list(STRING2TIMEFRAME_MAP.values())
         start = time.time()
 

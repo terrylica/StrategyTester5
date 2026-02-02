@@ -130,8 +130,7 @@ class StrategyTester:
             symbol_info_func=self.symbol_info,
         )
 
-        if self.IS_TESTER:
-            hist_manager.synchronize_timeframes()
+        hist_manager.synchronize_timeframes()
 
         self.logger.info("Initialized")
 
