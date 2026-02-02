@@ -1,10 +1,11 @@
+import logging
 import os
 import sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)  # insert(0) so it wins over other paths
 
-from strategytester5.tester import StrategyTester, MetaTrader5
+from strategytester5.tester import StrategyTester, MetaTrader5 as mt5
 from strategytester5.trade_classes.Trade import CTrade
 import json
 from datetime import datetime
@@ -19,8 +20,11 @@ try:
 except Exception as e:
     raise RuntimeError(e)
 
+if not mt5.initialize():
+    raise RuntimeError(f"Failed to initialize MT5, Error = {mt5.last_error()}")
+
 tester_configs = configs_json["tester"]
-tester = StrategyTester(tester_config=tester_configs) # very important
+tester = StrategyTester(tester_config=tester_configs, logging_level=logging.DEBUG, mt5_instance=mt5) # very important
 
 # ---------------------- inputs ----------------------------
 
@@ -54,7 +58,7 @@ def martingale_lotsize(initial_lot: float, current_time: datetime, multiplier: f
 
     last_deal = deals[-1]
 
-    if last_deal.entry == MetaTrader5.DEAL_ENTRY_OUT: # a closed operation
+    if last_deal.entry == mt5.DEAL_ENTRY_OUT: # a closed operation
         if last_deal.profit < 0: # if the deal made a loss
             return last_deal.volume * multiplier
 
@@ -74,10 +78,10 @@ def on_tick():
     lotsize = 0.01
     final_lotsize = martingale_lotsize(initial_lot=lotsize, current_time=curr_time, multiplier=2)
 
-    if not pos_exists(magic=magic_number, type=MetaTrader5.POSITION_TYPE_BUY):  # If a position of such kind doesn't exist
+    if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_BUY):  # If a position of such kind doesn't exist
         m_trade.buy(volume=final_lotsize, symbol=symbol, price=ask, sl=ask - sl * pts, tp=ask + tp * pts, comment="Tester buy")  # we open a buy position
 
-    if not pos_exists(magic=magic_number, type=MetaTrader5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
+    if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
         m_trade.sell(volume=final_lotsize, symbol=symbol, price=bid, sl=bid + sl * pts, tp=bid - tp * pts, comment="Tester sell")  # we open a sell position
 
 tester.OnTick(ontick_func=on_tick) # very important!

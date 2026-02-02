@@ -5,7 +5,7 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)  # insert(0) so it wins over other paths
 
-from strategytester5.tester import StrategyTester, MetaTrader5
+from strategytester5.tester import StrategyTester, MetaTrader5 as mt5
 from strategytester5.trade_classes.Trade import CTrade
 import json
 
@@ -19,7 +19,12 @@ try:
 except Exception as e:
     raise RuntimeError(e)
 
-tester = StrategyTester(tester_config=tester_configs["tester"], logging_level=logging.DEBUG) # very important
+if not mt5.initialize():
+    raise RuntimeError("Failed to initialize mt5.")
+
+tester = StrategyTester(tester_config=tester_configs["tester"],
+                        mt5_instance=mt5,
+                        logging_level=logging.DEBUG) # very important
 
 # ---------------------- inputs ----------------------------
 
@@ -52,10 +57,10 @@ def on_tick():
     
     pts = symbol_info.point
 
-    if not pos_exists(magic=magic_number, type=MetaTrader5.POSITION_TYPE_BUY):  # If a position of such kind doesn't exist
+    if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_BUY):  # If a position of such kind doesn't exist
         m_trade.buy(volume=0.01, symbol=symbol, price=ask, sl=ask - sl * pts, tp=ask + tp * pts, comment="Tester buy")  # we open a buy position
 
-    if not pos_exists(magic=magic_number, type=MetaTrader5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
+    if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
         m_trade.sell(volume=0.01, symbol=symbol, price=bid, sl=bid + sl * pts, tp=bid - tp * pts, comment="Tester sell")  # we open a sell position
 
 tester.OnTick(ontick_func=on_tick) # very important!
