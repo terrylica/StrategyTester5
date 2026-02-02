@@ -19,7 +19,7 @@ pip install strategytester5
 # optional:
 pip install "strategytester5[mt5]"
 ```
-> Note: The MetaTrader5 Python package is primarily distributed for Windows; on Linux/macOS it often requires Wine or a VM depending on user setup. (Your core package can still work without the MT5 bindings if you have offline history / tester-mode.)
+> Note: The second command with "[mt5]" installs the MetaTrader5 Python package which is primarily distributed for Windows; Doing so on Linux/macOS might throw critical pip installation errors. (Your core package can still work without the MT5 bindings if you have offline history, broker data for the tester-mode.) 
 
 ### Making your First MetaTrader5 Trading Robot in The Strategy Tester
 
