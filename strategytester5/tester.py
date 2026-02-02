@@ -374,13 +374,12 @@ class StrategyTester:
                 rates = (
                     lf
                     .filter(
-                            (pl.col("time") >= date_from) &
-                            (pl.col("time") <= date_to)
+                            (pl.col("time") >= date_from.timestamp()) &
+                            (pl.col("time") <= date_to.timestamp())
                         ) # get bars between date_from and date_to
                     .sort("time", descending=True)
                     .select([
-                        pl.col("time").dt.epoch("s").cast(pl.Int64).alias("time"),
-
+                        pl.col("time"),
                         pl.col("open"),
                         pl.col("high"),
                         pl.col("low"),
@@ -548,7 +547,7 @@ class StrategyTester:
             try:
                 ticks = (
                     lf
-                    .filter(pl.col("time") >= date_from) # get data starting at the given date
+                    .filter(pl.col("time") >= date_from.timestamp()) # get data starting at the given date
                     .filter((pl.col("flags") & flag_mask) != 0)
                     .sort(
                         ["time", "time_msc"],
@@ -606,6 +605,8 @@ class StrategyTester:
         if isinstance(date_to, (int, float)):
             date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
 
+        t_from_ms = int(date_from.timestamp() * 1000)
+        t_to_ms = int(date_to.timestamp() * 1000)
         flag_mask = self.__tick_flag_mask(flags)
 
         if self.IS_TESTER:    
@@ -623,9 +624,13 @@ class StrategyTester:
                 ticks = (
                     lf
                     .filter(
-                            (pl.col("time") >= date_from) &
-                            (pl.col("time") <= date_to)
+                            (pl.col("time") >= date_from.timestamp()) &
+                            (pl.col("time") <= date_to.timestamp())
                         ) # get ticks between date_from and date_to
+                    .filter(
+                        (pl.col("time_msc") >= t_from_ms) &
+                        (pl.col("time_msc") <= t_to_ms)
+                    )
                     .filter((pl.col("flags") & flag_mask) != 0)
                     .sort(
                         ["time", "time_msc"],

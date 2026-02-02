@@ -139,7 +139,7 @@ def get_bars_from_history(
     pattern = os.path.join(hist_dir, "Bars", symbol, timeframe, "**", "*.parquet")
     files = glob.glob(pattern, recursive=True)
 
-    if files:
+    if not files:
         logger.critical(f"Failed to obtain bars history, data path couldn't be found for {symbol} and {timeframe}: path = {files}")
         return pl.DataFrame()
 
