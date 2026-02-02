@@ -7,11 +7,21 @@ StrategyTester is a Python-based backtesting and strategy testing framework buil
 
 Ensure you have the MetaTrader 5 desktop application then proceeed to install the dependencies used in this project in your Python virtual environment
 
+**On Windows:**
 ```bash
-pip install strategytester5
+pip install strategytester5["mt5"]
 ```
 
-### Running your First Robot in The Strategy Tester
+**On Linux/MacOS:**
+
+```bash
+pip install strategytester5
+# optional:
+pip install "strategytester5[mt5]"
+```
+> Note: The MetaTrader5 Python package is primarily distributed for Windows; on Linux/macOS it often requires Wine or a VM depending on user setup. (Your core package can still work without the MT5 bindings if you have offline history / tester-mode.)
+
+### Making your First MetaTrader5 Trading Robot in The Strategy Tester
 
 **Step 1: Initialize the desired MetaTrader 5 terminal right after importing its module, alongside other useful Python modules for this project.**
 
@@ -109,9 +119,19 @@ def on_tick():
 ```python
 tester.OnTick(ontick_func=on_tick) # very important!
 ```
+**Step 6: Running your Systems**
 
-https://github.com/user-attachments/assets/09ed6921-8f00-4b49-8bcf-c6ac6ae9cdb3
+On Windows you have two options:
+**A: Running your robot(s) in a simulated environment using information stored in custom broker's directory and a specified history folder 'history_dir''**
+```bash
+python example_bot.py
+```
 
+**B: Running your robot(s) in a simulated environment but relying on the MetaTrader5-API for all information and history**
+```bash
+python example_bot.py --mt5
+```
+> Note: To run a script/robot in MetaTrader 5 mode, the platform must be installed and initialized before assigned to the StrategyTester class*
 
 **More information about the project**
 
