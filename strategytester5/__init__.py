@@ -1,4 +1,4 @@
-__version__ = '1.6.2'
+__version__ = '1.6.21'
 __author__  = 'Omega Joctan Msigwa.'
 
 from collections import namedtuple
