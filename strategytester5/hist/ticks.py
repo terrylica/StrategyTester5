@@ -5,6 +5,7 @@ import numpy as np
 import os
 from typing import Optional
 import logging
+import glob
 
 def ticks_to_polars(ticks):
     return pl.DataFrame({
@@ -107,15 +108,17 @@ def get_ticks_from_history(
 
     t_from_s  = int(start_dt.timestamp())
     t_to_s    = int(end_dt.timestamp())
-    # t_from_ms = int(start_dt.timestamp() * 1000)
-    # t_to_ms   = int(end_dt.timestamp() * 1000)
+    t_from_ms = int(start_dt.timestamp() * 1000)
+    t_to_ms   = int(end_dt.timestamp() * 1000)
 
-    guess_path = os.path.join(hist_dir, "Ticks", symbol)
-    if not os.path.exists(guess_path):
-        if logger: logger.critical(f"Failed to obtain history, path not found: {guess_path}")
+    pattern = os.path.join(hist_dir, "Ticks", symbol, "**", "*.parquet")
+    files = glob.glob(pattern, recursive=True)
+
+    if not files:
+        if logger: logger.critical(f"Failed to obtain ticks from history for {symbol}, path not found: {files}")
         return pl.DataFrame()
 
-    lf = pl.scan_parquet(guess_path)
+    lf = pl.scan_parquet(files)
 
     # coarse filter by seconds + exact by milliseconds
     ticks_lf = (
@@ -124,10 +127,10 @@ def get_ticks_from_history(
             (pl.col("time") >= t_from_s) &
             (pl.col("time") <= t_to_s)
         )
-        # .filter(
-        #     (pl.col("time_msc") >= t_from_ms) &
-        #     (pl.col("time_msc") <= t_to_ms)
-        # )
+        .filter(
+            (pl.col("time_msc") >= t_from_ms) &
+            (pl.col("time_msc") <= t_to_ms)
+        )
         .sort(["time", "time_msc"])
         .select([
             "time", "bid", "ask", "last", "volume", "time_msc", "flags", "volume_real"

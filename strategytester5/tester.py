@@ -361,7 +361,7 @@ class StrategyTester:
 
             str_timeframe = TIMEFRAME2STRING_MAP[timeframe]
 
-            pattern = os.path.join(self.history_dir, "Bars", symbol, "**", "*.parquet")
+            pattern = os.path.join(self.history_dir, "Bars", symbol, str_timeframe, "**", "*.parquet")
             files = glob.glob(pattern, recursive=True)
 
             if not files:

@@ -5,6 +5,7 @@ from strategytester5 import MetaTrader5, ensure_utc, TIMEFRAME2STRING_MAP, month
 import os
 from typing import Optional
 import logging
+import glob
 
 def bars_to_polars(bars):
     
@@ -135,12 +136,14 @@ def get_bars_from_history(
     if isinstance(timeframe, (int, float)):
         timeframe = TIMEFRAME2STRING_MAP[timeframe]
 
-    guess_path = os.path.join(hist_dir, "Bars", symbol, timeframe)
-    if not os.path.exists(guess_path):
-        logger.critical(f"Failed to obtain history, data path couldn't be found for {symbol} and {timeframe}: path = {guess_path}")
+    pattern = os.path.join(hist_dir, "Bars", symbol, timeframe, "**", "*.parquet")
+    files = glob.glob(pattern, recursive=True)
+
+    if files:
+        logger.critical(f"Failed to obtain bars history, data path couldn't be found for {symbol} and {timeframe}: path = {files}")
         return pl.DataFrame()
 
-    lf = pl.scan_parquet(guess_path)
+    lf = pl.scan_parquet(files)
 
     try:
         lf2 = (
