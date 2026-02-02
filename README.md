@@ -16,17 +16,20 @@ pip install strategytester5
 **Step 1: Initialize the desired MetaTrader 5 terminal right after importing its module, alongside other useful Python modules for this project.**
 
 ```python
-import MetaTrader5 as mt5
-from strategytester5.tester import StrategyTester
+import logging
+import os
+import sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, ROOT)  # insert(0) so it wins over other paths
+
+from strategytester5.tester import StrategyTester, MetaTrader5 as mt5
 from strategytester5.trade_classes.Trade import CTrade
 import json
-import os
-import config
 
-if not mt5.initialize(): # Initialize MetaTrader5 instance
-    print(f"Failed to Initialize MetaTrader5. Error = {mt5.last_error()}")
-    mt5.shutdown()
-    quit()
+
+if not mt5.initialize():
+    raise RuntimeError("Failed to initialize mt5.")
 ```
 
 See examples the examples [https://github.com/MegaJoctan/StrategyTester5/tree/main/examples](https://github.com/MegaJoctan/StrategyTester5/tree/main/examples)
@@ -34,6 +37,7 @@ See examples the examples [https://github.com/MegaJoctan/StrategyTester5/tree/ma
 **Step 2: Load configurations from a JSON file. *In this case configs/tester.json file*.**
 
 ```python
+
 # Get path to the folder where this script lives
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -48,7 +52,10 @@ except Exception as e:
 **Step 3: Initialize the Tester class, giving it configurations and an initialized MetaTrader 5 instance.**
 
 ```python
-tester = StrategyTester(tester_config=tester_configs["tester"], mt5_instance=mt5) # very important
+tester = StrategyTester(tester_config=tester_configs["tester"],
+                        mt5_instance=mt5,
+                        logging_level=logging.DEBUG,
+                        broker_data_dir="ICMarketsSC-Demo") 
 ```
 
 **Optionally, instantiate the CTrade class to make life much easier.**
