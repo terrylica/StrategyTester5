@@ -24,7 +24,8 @@ if not mt5.initialize():
 
 tester = StrategyTester(tester_config=tester_configs["tester"],
                         mt5_instance=mt5,
-                        logging_level=logging.DEBUG) # very important
+                        logging_level=logging.DEBUG,
+                        broker_data_dir="ICMarketsSC-Demo")
 
 # ---------------------- inputs ----------------------------
 
