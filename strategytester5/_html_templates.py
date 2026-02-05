@@ -85,16 +85,28 @@ def html_report_template() -> str:
                 font-size: 11px;
                 padding: 6px 8px;
             }
-    
-            /* Curve */
-            .curve-wrapper {
-                display: flex;
-                justify-content: center;
+        
+            /* Curve container should take full width */
+            .curve-wrapper{
+                width: 100%;
+                display: block;         /* remove flex shrink behavior */
                 margin: 12px 0 16px;
             }
-    
-            .curve-img {
-                max-width: 60%;
+            
+            /* Plotly iframe sizing */
+            .curve-iframe{
+                width: 100%;
+                height: 420px;          /* adjust as you like */
+                border: 0;
+                display: block;
+            }
+        
+            /* If you still use PNG fallback */
+            .curve-img{
+                width: 100%;
+                max-height: 420px;
+                object-fit: contain;
+                display: block;
             }
     
             /* Clean Bootstrap interference */
