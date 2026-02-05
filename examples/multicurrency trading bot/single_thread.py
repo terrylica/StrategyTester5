@@ -6,8 +6,10 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)  # insert(0) so it wins over other paths
 
 from strategytester5.tester import StrategyTester, MetaTrader5 as mt5
+from strategytester5 import PeriodSeconds, TIMEFRAME2STRING_MAP
 import json
 import os
+from datetime import datetime
 
 # Get path to the folder where this script lives
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -35,12 +37,24 @@ timeframes = [mt5.TIMEFRAME_M15, mt5.TIMEFRAME_H1, mt5.TIMEFRAME_H4, mt5.TIMEFRA
 
 # ---------------------------------------------------------
 
+def is_newbar(current_time: datetime, tf: int) -> bool:
+
+    """A function to help in detecting the opening of a bar"""
+
+    tf_seconds = PeriodSeconds(tf)
+    curr_ts = int(current_time.timestamp())
+
+    return curr_ts % tf_seconds == 0
+
 def on_tick():
 
     for symbol in symbols:
         for tf in timeframes:
 
-            rates = tester.copy_rates_from_pos(symbol=symbol, timeframe=tf, start_pos=0, count=5)
+            rates = None
+            if is_newbar(tester.current_time, tf):
+                rates = tester.copy_rates_from_pos(symbol=symbol, timeframe=tf, start_pos=0, count=5)
+                # print(f"new bar at: {tester.current_time} on symbol: {symbol} tf: {TIMEFRAME2STRING_MAP[tf]}")
 
             if rates is None:
                 continue

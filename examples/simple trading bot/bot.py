@@ -43,10 +43,11 @@ symbol_info = tester.symbol_info(symbol=symbol)
 
 def pos_exists(magic: int, type: int) -> bool:
 
-    for position in tester.positions_get():
+    positions_found = tester.positions_get()
+    for position in positions_found:
         if position.type == type and position.magic == magic:
             return True
-    
+
     return False
 
 def on_tick():

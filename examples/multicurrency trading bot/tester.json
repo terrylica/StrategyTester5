@@ -1,11 +1,11 @@
 {
     "tester": {
-        "bot_name": "MY EA",
+        "bot_name": "multi-curency-EA",
         "symbols": ["EURUSD", "GBPUSD", "USDCAD"],
         "timeframe": "H1",
         "start_date": "01.01.2025 00:00",
         "end_date": "31.12.2025 00:00",
-        "modelling" : "real_ticks",
+        "modelling" : "new_bar",
         "deposit": 1000,
         "leverage": "1:100"
     }
