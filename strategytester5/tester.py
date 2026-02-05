@@ -296,17 +296,17 @@ class StrategyTester:
         """
 
         tick = None
-        if self.IS_TESTER:
-            try:
-                tick = self.tick_cache[symbol]
-            except KeyError:
-                self.logger.warning(f"{symbol} not found in the tick cache")
-        else:
-            try:
-                tick = self.mt5_instance.symbol_info_tick(symbol)
-            except Exception as e:
-                self.logger.warning(f"Failed. MT5 Error = {self.mt5_instance.last_error()}")
-            
+        # if self.IS_TESTER:
+        try:
+            tick = self.tick_cache[symbol]
+        except KeyError:
+            self.logger.warning(f"{symbol} not found in the tick cache")
+        # else:
+        #     try:
+        #         tick = self.mt5_instance.symbol_info_tick(symbol)
+        #     except Exception as e:
+        #         self.logger.warning(f"Failed. MT5 Error = {self.mt5_instance.last_error()}")
+        #
         return tick
     
     def TickUpdate(self, symbol: str, tick: any):
