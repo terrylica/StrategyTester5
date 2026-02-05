@@ -1,6 +1,9 @@
 import inspect
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pandas as pd
+
 from strategytester5 import *
 from datetime import datetime, timedelta
 import secrets
@@ -184,6 +187,10 @@ class StrategyTester:
         self.IS_STOPPED = False
         self._engine_lock = threading.RLock()   # re-entrant lock (safe if functions call other locked functions)
 
+        # ---------------------- others ------------------------------
+
+        self.__last_tick_time: int
+
     @staticmethod
     def _to_accountinfo_namedtuple(obj) -> AccountInfo:
         """
@@ -318,7 +325,8 @@ class StrategyTester:
         
         if isinstance(tick, tuple):
             tick = make_tick_from_tuple(tick)
-        
+
+        self.__last_tick_time = tick.time
         self.tick_cache[symbol] = tick
 
     @staticmethod
@@ -672,17 +680,9 @@ class StrategyTester:
         Returns (int): The number of active orders in either a simulator or MetaTrader 5, or
                         returns a negative number if there was an error getting the value
         """
-        
-        if self.IS_TESTER:
-            return len(self.__orders_container__)
-        try:
-            total = self.mt5_instance.orders_total()
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
-            return -1
-        
-        return total
-    
+
+        return len(self.__orders_container__)
+
     def orders_get(self, symbol: Optional[str] = None, group: Optional[str] = None, ticket: Optional[int] = None) -> tuple[TradeOrder]:
                 
         """Get active orders with the ability to filter by symbol or ticket. There are three call options.
@@ -698,28 +698,29 @@ class StrategyTester:
             list: Returns info in the form of a tuple structure (TradeOrder). Return None in case of an error. The info on the error can be obtained using last_error().
         """
         
-        if self.IS_TESTER:
+        # if self.IS_TESTER:
             
-            orders = self.__orders_container__
+        orders = self.__orders_container__
 
-            # no filters → return all orders
-            if symbol is None and group is None and ticket is None:
-                return tuple(orders)
+        # no filters → return all orders
+        if symbol is None and group is None and ticket is None:
+            return tuple(orders)
 
-            # symbol filter (highest priority)
-            if symbol is not None:
-                return tuple(o for o in orders if o.symbol == symbol)
+        # symbol filter (highest priority)
+        if symbol is not None:
+            return tuple(o for o in orders if o.symbol == symbol)
 
-            # group filter
-            if group is not None:
-                return tuple(o for o in orders if fnmatch.fnmatch(o.symbol, group))
+        # group filter
+        if group is not None:
+            return tuple(o for o in orders if fnmatch.fnmatch(o.symbol, group))
 
-            # ticket filter
-            if ticket is not None:
-                return tuple(o for o in orders if o.ticket == ticket)
+        # ticket filter
+        if ticket is not None:
+            return tuple(o for o in orders if o.ticket == ticket)
 
-            return tuple()
-        
+        return tuple()
+
+        """
         try:
             if symbol is not None:
                 return self.mt5_instance.orders_get(symbol=symbol)
@@ -735,6 +736,7 @@ class StrategyTester:
         except Exception as e:
             self.logger.error(f"MetaTrader5 error = {e}")
             return None
+        """
 
     def positions_total(self) -> int:
         """Get the number of open positions in MetaTrader 5 client.
@@ -742,16 +744,7 @@ class StrategyTester:
         Returns:
             int: number of positions
         """
-        
-        if self.IS_TESTER:
-            return len(self.__positions_container__)        
-        try:
-            total = self.mt5_instance.positions_total()
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
-            return -1
-        
-        return total
+        return len(self.__positions_container__)
 
     def positions_get(self, symbol: Optional[str] = None, group: Optional[str] = None, ticket: Optional[int] = None) -> tuple[TradePosition]:
         
@@ -768,43 +761,27 @@ class StrategyTester:
             list: Returns info in the form of a tuple structure (TradePosition). Return None in case of an error. The info on the error can be obtained using last_error().
         """
         
-        if self.IS_TESTER:
-            
-            positions = self.__positions_container__
+        # if self.IS_TESTER:
 
-            # no filters → return all positions
-            if symbol is None and group is None and ticket is None:
-                return tuple(positions)
+        positions = self.__positions_container__
 
-            # symbol filter (highest priority)
-            if symbol is not None:
-                return tuple(o for o in positions if o.symbol == symbol)
+        # no filters → return all positions
+        if symbol is None and group is None and ticket is None:
+            return tuple(positions)
 
-            # group filter
-            if group is not None:
-                return tuple(o for o in positions if fnmatch.fnmatch(o.symbol, group))
+        # symbol filter (highest priority)
+        if symbol is not None:
+            return tuple(o for o in positions if o.symbol == symbol)
 
-            # ticket filter
-            if ticket is not None:
-                return tuple(o for o in positions if o.ticket == ticket)
+        # group filter
+        if group is not None:
+            return tuple(o for o in positions if fnmatch.fnmatch(o.symbol, group))
 
-            return tuple()
-        
-        try:
-            if symbol is not None:
-                return self.mt5_instance.positions_get(symbol=symbol)
+        # ticket filter
+        if ticket is not None:
+            return tuple(o for o in positions if o.ticket == ticket)
 
-            if group is not None:
-                return self.mt5_instance.positions_get(group=group)
-
-            if ticket is not None:
-                return self.mt5_instance.positions_get(ticket=ticket)
-
-            return self.mt5_instance.positions_get()
-
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
-            return None
+        return tuple()
 
     def history_orders_total(self, date_from: datetime, date_to: datetime) -> int:
         
@@ -814,24 +791,16 @@ class StrategyTester:
         date_from = ensure_utc(date_from)
         date_to = ensure_utc(date_to)
         
-        if self.IS_TESTER:
+        # if self.IS_TESTER:
         
-            date_from_ts = int(date_from.timestamp())
-            date_to_ts   = int(date_to.timestamp())
-            
-            return sum(
-                        1
-                        for o in self.__orders_history_container__
-                        if date_from_ts <= o.time_setup <= date_to_ts
-                    )
+        date_from_ts = int(date_from.timestamp())
+        date_to_ts   = int(date_to.timestamp())
 
-        try:
-            total = self.mt5_instance.history_orders_total(date_from, date_to)
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
-            return -1
-        
-        return total
+        return sum(
+                    1
+                    for o in self.__orders_history_container__
+                    if date_from_ts <= o.time_setup <= date_to_ts
+                )
     
     def history_orders_get(self, 
                            date_from: datetime,
@@ -844,65 +813,40 @@ class StrategyTester:
         if not isinstance(date_from, datetime) or not isinstance(date_to, datetime):
             raise ValueError("date_from and date_to must be specified")
         
-        if self.IS_TESTER:
+        # if self.IS_TESTER:
 
-            orders = self.__orders_history_container__
+        orders = self.__orders_history_container__
 
-            # ticket filter (highest priority)
-            if ticket is not None:
-                return tuple(o for o in orders if o.ticket == ticket)
+        # ticket filter (highest priority)
+        if ticket is not None:
+            return tuple(o for o in orders if o.ticket == ticket)
 
-            # position filter
-            if position is not None:
-                return tuple(o for o in orders if o.position_id == position)
+        # position filter
+        if position is not None:
+            return tuple(o for o in orders if o.position_id == position)
 
-            # date range is a requirement  
-            if date_from is None or date_to is None:
-                self.logger.error("date_from and date_to must be specified")
-                return None
-
-            date_from_ts = int(ensure_utc(date_from).timestamp())
-            date_to_ts   = int(ensure_utc(date_to).timestamp())
-
-            filtered = (
-                o for o in orders
-                if date_from_ts <= o.time_setup <= date_to_ts
-            ) # obtain orders that fall within this time range
-
-            # optional group filter
-            if group is not None:
-                filtered = (
-                    o for o in filtered
-                    if fnmatch.fnmatch(o.symbol, group)
-                )
-
-            return tuple(filtered)
-    
-        try: # we are not on the strategy tester simulation
-            
-            if ticket is not None:
-                return self.mt5_instance.history_orders_get(date_from, date_to, ticket=ticket)
-
-            if position is not None:
-                return self.mt5_instance.history_orders_get(date_from, date_to, position=position)
-
-            if date_from is None or date_to is None:
-                raise ValueError("date_from and date_to are required")
-
-            date_from = ensure_utc(date_from)
-            date_to   = ensure_utc(date_to)
-
-            if group is not None:
-                return self.mt5_instance.history_orders_get(
-                    date_from, date_to, group=group
-                )
-
-            return self.mt5_instance.history_orders_get(date_from, date_to)
-
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
+        # date range is a requirement
+        if date_from is None or date_to is None:
+            self.logger.error("date_from and date_to must be specified")
             return None
-    
+
+        date_from_ts = int(ensure_utc(date_from).timestamp())
+        date_to_ts   = int(ensure_utc(date_to).timestamp())
+
+        filtered = (
+            o for o in orders
+            if date_from_ts <= o.time_setup <= date_to_ts
+        ) # obtain orders that fall within this time range
+
+        # optional group filter
+        if group is not None:
+            filtered = (
+                o for o in filtered
+                if fnmatch.fnmatch(o.symbol, group)
+            )
+
+        return tuple(filtered)
+
     def history_deals_total(self, date_from: datetime, date_to: datetime) -> int:
         """
         Get the number of deals in history within the specified date range.
@@ -921,23 +865,16 @@ class StrategyTester:
         if isinstance(date_to, (int, float)):
             date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
 
-        if self.IS_TESTER:
+        # if self.IS_TESTER:
 
-            date_from_ts = int(date_from.timestamp())
-            date_to_ts   = int(date_to.timestamp())
+        date_from_ts = int(date_from.timestamp())
+        date_to_ts   = int(date_to.timestamp())
 
-            return sum(
-                1
-                for d in self.__deals_history_container__
-                if date_from_ts <= d.time <= date_to_ts
-            )
-
-        try:
-            return self.mt5_instance.history_deals_total(date_from, date_to)
-
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
-            return -1
+        return sum(
+            1
+            for d in self.__deals_history_container__
+            if date_from_ts <= d.time <= date_to_ts
+        )
     
     def history_deals_get(self,
                           date_from: datetime,
@@ -971,61 +908,39 @@ class StrategyTester:
         if isinstance(date_to, (int, float)):
             date_to = datetime.fromtimestamp(date_to, tz=timezone.utc)
 
-        if self.IS_TESTER:
+        # if self.IS_TESTER:
 
-            deals = self.__deals_history_container__
+        deals = self.__deals_history_container__
 
-            # ticket filter (highest priority)
-            if ticket is not None:
-                return tuple(d for d in deals if d.ticket == ticket)
+        # ticket filter (highest priority)
+        if ticket is not None:
+            return tuple(d for d in deals if d.ticket == ticket)
 
-            # position filter
-            if position is not None:
-                return tuple(d for d in deals if d.position_id == position)
+        # position filter
+        if position is not None:
+            return tuple(d for d in deals if d.position_id == position)
 
-            # date range is a requirement  
-            if date_from is None or date_to is None:
-                self.logger.error("date_from and date_to must be specified")
-                return None
-
-            date_from_ts = int(ensure_utc(date_from).timestamp())
-            date_to_ts   = int(ensure_utc(date_to).timestamp())
-
-            filtered = (
-                d for d in deals
-                if date_from_ts <= d.time <= date_to_ts
-            ) # obtain orders that fall within this time range
-
-            # optional group filter
-            if group is not None:
-                filtered = (
-                    d for d in filtered
-                    if fnmatch.fnmatch(d.symbol, group)
-                )
-
-            return tuple(filtered)
-    
-        try: # we are not on the strategy tester simulation
-            
-            if ticket is not None:
-                return self.mt5_instance.history_deals_get(date_from, date_to, ticket=ticket)
-
-            if position is not None:
-                return self.mt5_instance.history_deals_get(date_from, date_to, position=position)
-
-            if date_from is None or date_to is None:
-                raise ValueError("date_from and date_to are required")
-
-            if group is not None:
-                return self.mt5_instance.history_deals_get(
-                    date_from, date_to, group=group
-                )
-
-            return self.mt5_instance.history_deals_get(date_from, date_to)
-
-        except Exception as e:
-            self.logger.error(f"MetaTrader5 error = {e}")
+        # date range is a requirement
+        if date_from is None or date_to is None:
+            self.logger.error("date_from and date_to must be specified")
             return None
+
+        date_from_ts = int(ensure_utc(date_from).timestamp())
+        date_to_ts   = int(ensure_utc(date_to).timestamp())
+
+        filtered = (
+            d for d in deals
+            if date_from_ts <= d.time <= date_to_ts
+        ) # obtain orders that fall within this time range
+
+        # optional group filter
+        if group is not None:
+            filtered = (
+                d for d in filtered
+                if fnmatch.fnmatch(d.symbol, group)
+            )
+
+        return tuple(filtered)
 
     def __generate_deal_ticket(self) -> int:
         return len(self.__deals_history_container__)+1
@@ -1110,16 +1025,16 @@ class StrategyTester:
 
         # -----------------------------------------------------
 
+        """
         if not self.IS_TESTER:
             return
 
-            """
             result = self.mt5_instance.order_send(request)
             if result is None or result.retcode != self.mt5_instance.TRADE_RETCODE_DONE:
                 self.logger.warning(f"MT5 failed: {error_description.trade_server_return_code_description(self.mt5_instance.last_error()[0])}")
                 return None
             return result
-            """
+        """
 
         # -------------------- Extract request -----------------------------
         
@@ -1243,6 +1158,7 @@ class StrategyTester:
                 )
 
                 self.logger.info(f"Position: {position_ticket} closed!")
+                self.logger.debug("")
                 self.logger.debug(f"balance: {self.AccountInfo.balance:.2f} equity: {self.AccountInfo.equity:2f} pl: {self.AccountInfo.profit:.2f}")
                 
                 return {
@@ -1332,10 +1248,9 @@ class StrategyTester:
                     balance=self.AccountInfo.balance,
                 )
             )
-            
-            
-            self.logger.info(f"Position: {position_ticket} opened!")
-                
+
+            self.logger.info(f"{ORDER_TYPE_MAP[order_type]} Position: {position_ticket} opened!")
+
             return {
                 "retcode": self.mt5_instance.TRADE_RETCODE_DONE,
                 "deal": deal_ticket,
@@ -1973,6 +1888,14 @@ class StrategyTester:
             self.__make_balance_deal(time=self.tester_config["start_date"])
         )
 
+    @property
+    def current_idx(self) -> int:
+        return self.TESTER_IDX
+
+    @property
+    def current_time(self) -> datetime:
+        return datetime.fromtimestamp(self.__last_tick_time, tz=timezone.utc)
+
     def __curves_update(self, index, time):
 
         if isinstance(time, datetime):
@@ -2184,10 +2107,10 @@ class StrategyTester:
                         self.__pending_orders_monitoring()
 
                     if isinstance(tick, dict):
-                        time = tick["time"]
+                        time = tick["time_msc"]
                     elif isinstance(tick, tuple):
                         tick = make_tick_from_tuple(tick)
-                        time = tick.time
+                        time = tick.time_msc
                     else:
                         self.logger.error("Unknown tick type")
                         continue
@@ -2277,60 +2200,95 @@ class StrategyTester:
 
         self.__GenerateTesterReport(output_file=f"Reports/{self.tester_config['bot_name']}-report.html")
 
-    def _plot_tester_curves(self, output_path: str) -> str | None:
+    def _plot_tester_curves_plotly(self) -> str | None:
+        try:
+            import plotly.graph_objects as go
+        except ImportError:
+            raise ImportError("Plotly not installed. Run: pip install plotly")
 
         curves = self.tester_curves
+        n = int(self.CURVES_IDX)
 
-        n = int(self.CURVES_IDX)  # how many points you actually filled
-        # if n <= 0:
-        #     return None
+        if n <= 0:
+            return None
 
         t = curves["time"][:n]
         bal = curves["balance"][:n]
         eq = curves["equity"][:n]
 
-        # IMPORTANT: sort by time (because parallel threads interleave symbols)
         order = np.argsort(t)
         t = t[order]
         bal = bal[order]
         eq = eq[order]
 
-        times = [datetime.fromtimestamp(x) for x in t]
+        times = [datetime.fromtimestamp(x, tz=timezone.utc) for x in t]
 
-        plt.style.use("seaborn-v0_8-darkgrid")
-        plt.figure(figsize=(10, 4))
-        plt.plot(times, bal, label="Balance", linewidth=2, color="#1f77b4")
-        plt.plot(times, eq, label="Equity", linewidth=1.5, color="#0b6623", alpha=0.6)
+        fig = go.Figure()
 
-        plt.legend(loc="lower left")
-        plt.tight_layout()
-        plt.savefig(output_path, dpi=300, transparent=False)
-        plt.close()
+        # ---- RAW curves (hidden by default) ----
+        fig.add_trace(go.Scatter(
+            x=times, y=bal,
+            mode="lines",
+            name="Balance (raw)",
+            visible="legendonly",
+            hovertemplate="Time: %{x}<br>Balance: %{y:.2f}<extra></extra>",
+        ))
 
-        return output_path
+        fig.add_trace(go.Scatter(
+            x=times, y=eq,
+            mode="lines",
+            name="Equity (raw)",
+            visible="legendonly",
+            hovertemplate="Time: %{x}<br>Equity: %{y:.2f}<extra></extra>",
+        ))
+
+        # ---- SMOOTHED curves (visible by default) ----
+        fig.add_trace(go.Scatter(
+            x=times,
+            y=pd.Series(bal).rolling(window=20).mean(),
+            mode="lines",
+            name="Balance (smoothed)",
+            hovertemplate="Time: %{x}<br>Balance: %{y:.2f}<extra></extra>",
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=times,
+            y=pd.Series(eq).rolling(window=50).mean(),
+            mode="lines",
+            name="Equity (smoothed)",
+            hovertemplate="Time: %{x}<br>Equity: %{y:.2f}<extra></extra>",
+        ))
+
+        fig.update_layout(
+            xaxis_title="Time (UTC)",
+            yaxis_title="Account Value",
+            hovermode="x unified",
+            legend=dict(
+                title="Click to toggle",
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0
+            ),
+            margin=dict(l=40, r=20, t=40, b=40),
+        )
+
+        return fig.to_html(
+            full_html=False,
+            include_plotlyjs="cdn",
+            config={"responsive": True}
+        )
 
     def __GenerateTesterReport(self, output_file="StrategyTester report.html"):
 
-        # Balance and Equity curves
-
-        path = os.path.join(self.reports_dir, "images")
-        os.makedirs(path, exist_ok=True)
-
+        curve_block = ""  # <-- what we inject into {{CURVE_IMAGE}}
         try:
-            curve_img = self._plot_tester_curves(
-                output_path=os.path.join(
-                    path,
-                    f"{self.tester_config['bot_name'].replace(' ', '_')}_curve.png"
-                )
-            )
-            if curve_img:
-                curve_img = curve_img.replace(self.reports_dir + "\\", "")
+            curve_block = self._plot_tester_curves_plotly() or ""
         except Exception as e:
-            self.logger.warning(f"Failed to generate a balance curve {e!r}")
-            curve_img = None
+            self.logger.warning(f"Failed to generate interactive curve (plotly): {e!r}")
 
-        # ---------------- Render tester report with stas, orders and deals --------------------
-
+        # ---- Render report ----
         base_template = templates.html_report_template()
 
         stats_table = templates.render_stats_table(
@@ -2348,17 +2306,12 @@ class StrategyTester:
         order_rows_html = templates.render_order_rows(self.__orders_history_container__)
         deal_rows_html = templates.render_deal_rows(self.__deals_history_container__)
 
-        # we populate table's body
-
         html = (
             base_template
             .replace("{{STATS_TABLE}}", stats_table)
             .replace("{{ORDER_ROWS}}", order_rows_html)
             .replace("{{DEAL_ROWS}}", deal_rows_html)
-            .replace(
-            "{{CURVE_IMAGE}}",
-            f'<img src="{curve_img}" class="img-fluid curve-img">' if curve_img else ""
-            )
+            .replace("{{CURVE_IMAGE}}", curve_block)  # now supports both
         )
 
         with open(output_file, "w", encoding="utf-8") as f:
