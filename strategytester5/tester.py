@@ -1,10 +1,11 @@
 import inspect
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from logging import exception
 
 import pandas as pd
 
-from strategytester5 import *
+from . import *
 from datetime import datetime, timedelta
 import secrets
 import os
@@ -12,19 +13,19 @@ import numpy as np
 import fnmatch
 from typing import Optional
 import polars as pl
-from strategytester5.validators.trade import TradeValidators
-from strategytester5.validators.tester_configs import TesterConfigValidators
-import strategytester5._html_templates as templates
-from strategytester5.mt5 import constants as _mt5
-from strategytester5.hist.manager import HistoryManager
-from strategytester5.mt5.broker_data import Importers, Exporters
-from strategytester5 import stats
+from .validators.trade import TradeValidators
+from .validators.tester_configs import TesterConfigValidators
+from . import _html_templates as templates
+from .mt5 import constants as _mt5
+from .hist.manager import HistoryManager
+from .mt5.broker_data import Importers, Exporters
+from . import stats
 import sys
 import logging
 import glob
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
 
 mpl.rcParams["agg.path.chunksize"] = 10000
 mpl.rcParams["path.simplify"] = True
@@ -39,6 +40,7 @@ class StrategyTester:
                  reports_dir: Optional[str]="Reports",
                  history_dir: Optional[str]="History",
                  broker_data_dir: Optional[str]="ICMarketsSC-Demo",
+                 trading_history_dir: Optional[str] = "TradingHistory",
                  POLARS_COLLECT_ENGINE: str="auto"):
         
         """MetaTrader 5-Like Strategy tester for the MetaTrader5-Python module.
@@ -51,6 +53,7 @@ class StrategyTester:
             reports_dir (str): Directory for HTML reports and assets.
             history_dir (str): Directory for historical data storage.
             broker_data_dir (str | optional): Directory containing account_info.json, symbol_info.json and similar files containing information about the broker
+`           trading_history_dir (str | optional) A directory to keep trading history.
 
              POLARS_COLLECT_ENGINE (str): Engine used by Polars when collecting historical data in functions for obtaining ticks — copy_ticks*, and bars information/rates (copy_rates*). Supported values are:
                 - ``"auto"`` (default): Use Polars’ standard in-memory engine and
@@ -70,6 +73,7 @@ class StrategyTester:
         self.history_dir = history_dir
         self.POLARS_COLLECT_ENGINE = POLARS_COLLECT_ENGINE
         self.broker_data_dir = broker_data_dir
+        self.trading_history_dir = trading_history_dir
         
         self.symbol_info_cache: dict[str, SymbolInfo] = {}
         self.trade_validators_cache: dict[str, TradeValidators] = {}
@@ -1126,10 +1130,24 @@ class StrategyTester:
                 )
 
                 self.__account_monitoring(pos_must_exist=False)
-                self.__positions_container__.remove(pos) 
-                
+                self.__positions_container__.remove(pos)
+
+                idx = next(
+                    (i for i, o in enumerate(self.__orders_history_container__)
+                     if o.type == pos.type and o.position_id == pos.ticket),
+                    None
+                )
+
+                if idx is not None:
+                    self.__orders_history_container__[idx] = self.__orders_history_container__[idx]._replace(
+                        time_done=self.current_time.timestamp(),
+                        time_done_msc=int(self.current_time.timestamp() * 1000),
+                        volume_current=pos.volume,
+                        price_current=pos.price_current,
+                    )
+
                 # self.__orders_history_container__.append(
-                #     self.__position_to_order(position=position) #TODO:
+                #     self.__position_to_order(position=pos, ticket=self.__generate_order_history_ticket())
                 # )
                 
                 deal_ticket = self.__generate_deal_ticket()
@@ -2198,7 +2216,10 @@ class StrategyTester:
 
         # generate a report at the end
 
-        self.__GenerateTesterReport(output_file=f"Reports/{self.tester_config['bot_name']}-report.html")
+        os.makedirs(self.reports_dir, exist_ok=True)
+        self.__GenerateTesterReport(output_file=os.path.join(self.reports_dir, f"{self.tester_config['bot_name']}-report.html"))
+
+        self._save_trading_history(self.trading_history_dir)
 
     def _plot_tester_curves_plotly(self) -> str | None:
         try:
@@ -2318,3 +2339,22 @@ class StrategyTester:
             f.write(html)
 
         self.logger.info(f"Strategy tester report saved at: {output_file}")
+
+    def _save_trading_history(self, path: str):
+
+        # save the trading history
+        hist_dir = Path(path)
+        hist_dir.mkdir(parents=True, exist_ok=True)
+
+        orders_hist = self.__orders_history_container__
+        deals_hist = self.__deals_history_container__
+
+        try:
+            orders_csv = hist_dir / "orders.csv"
+            pd.DataFrame(orders_hist).to_csv(orders_csv, index=False)
+
+            deals_csv = hist_dir / "deals.csv"
+            pd.DataFrame(deals_hist).to_csv(deals_csv, index=False)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to save trading history: {e!r}")
