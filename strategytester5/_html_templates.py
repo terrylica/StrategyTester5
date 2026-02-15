@@ -207,6 +207,12 @@ def html_report_template() -> str:
             </div>
         </div>
         
+        <div class="section">
+            <div class="curve-wrapper">
+                {{POS_HOLDING_DASHBOARD}}
+            </div>
+        </div>
+        
         <h4>Orders</h4>
         <div class="section table-responsive">
             <table class="table table-sm table-striped align-middle">
