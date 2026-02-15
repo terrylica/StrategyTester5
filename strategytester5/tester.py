@@ -2331,6 +2331,9 @@ class StrategyTester:
         deals_df["time"] = pd.to_datetime(deals_df["time"], unit="s", errors="coerce")
         positions_stats_html = self._entries_and_pl_plotly(deals_df)
 
+        orders_df = pd.DataFrame(self.__orders_history_container__)
+        holding_dashboard_html = StrategyTester._holding_time_dashboard_figure(orders_df=orders_df)
+
         html = (
             base_template
             .replace("{{STATS_TABLE}}", stats_table)
@@ -2338,6 +2341,7 @@ class StrategyTester:
             .replace("{{DEAL_ROWS}}", deal_rows_html)
             .replace("{{CURVE_IMAGE}}", curve_block_html)
             .replace("{{POSITION_STATS_IMAGE}}", positions_stats_html)
+            .replace("{{POS_HOLDING_DASHBOARD}}", holding_dashboard_html)
         )
 
         with open(output_file, "w", encoding="utf-8") as f:
@@ -2433,6 +2437,97 @@ class StrategyTester:
             barmode="group",  # side-by-side exactly like your matplotlib version
             margin=dict(l=80, r=20, t=30, b=40),
             showlegend=False,
+        )
+
+        return fig.to_html(
+            full_html=False,
+            # include_plotlyjs="cdn",
+            config={"responsive": True}
+        )
+
+    @staticmethod
+    def _holding_time_calculator(entry_time: pd.Series, exit_time: pd.Series) -> dict:
+
+        durations = pd.to_timedelta(abs(entry_time - exit_time), unit="s")
+
+        return {
+            "count": int(len(durations)),
+            "durations": durations,
+            "min": durations.min(),
+            "max": durations.max(),
+            "avg": durations.mean(),
+        }
+
+    @staticmethod
+    def _holding_time_dashboard_figure(orders_df: pd.DataFrame) -> str:
+        # --- build durations in minutes (numeric) ---
+
+        entry = orders_df["time_setup"]
+        exit_ = orders_df["time_done"]
+
+        # keep only closed rows (avoid time_done == 0)
+        m = entry.notna() & exit_.notna() & (entry > 0) & (exit_ > 0)
+        durations_minutes = (exit_[m] - entry[m]).abs() / 60.0
+
+        if durations_minutes.empty:
+            fig = go.Figure()
+            fig.update_layout(title="No valid closed positions to compute holding time.")
+            return fig
+
+        # --- pie buckets ---
+        bins = [0, 5, 15, 60, 240, 1440, 10080, 43200, np.inf]  # minutes
+        labels = ["0-5m", "5-15m", "15m-1h", "1-4h", "4-24h", "1-7d", "7d-1mon", ">1mon"]
+
+        bucket = pd.cut(durations_minutes, bins=bins, labels=labels, right=False)
+        counts = bucket.value_counts().reindex(labels, fill_value=0)
+
+        # --- describe stats for the table ---
+        desc = durations_minutes.describe()  # count, mean, std, min, 25%, 50%, 75%, max
+
+        # format values (you can adjust)
+        table_header = ["mean", "std", "min", "25%", "50%", "75%", "max"]
+        table_values = [
+            f"{pd.to_timedelta(desc['mean'], unit='m')}",
+            f"{pd.to_timedelta(desc['std'], unit='m')}",
+            f"{pd.to_timedelta(desc['min'], unit='m')}",
+            f"{pd.to_timedelta(desc['25%'], unit='m')}",
+            f"{pd.to_timedelta(desc['50%'], unit='m')}",
+            f"{pd.to_timedelta(desc['75%'], unit='m')}",
+            f"{pd.to_timedelta(desc['max'], unit='m')}",
+        ]
+
+        # --- figure layout: pie (top) + table (bottom) ---
+        fig = make_subplots(
+            rows=1, cols=2,
+            specs=[[{"type": "pie"}, {"type": "table"}]],
+            column_widths=[0.6, 0.4],
+            vertical_spacing=0.10,
+            subplot_titles=("Positions by holding-time bucket", "Holding time summary"),
+            horizontal_spacing=0.15  # increase this (default ~0.05)
+        )
+
+        fig.add_trace(
+            go.Pie(
+                labels=labels,
+                values=counts.values,  # ensure it's an array
+                hole=0.35,
+                textinfo="percent+label"
+            ),
+            row=1, col=1
+        )
+
+        # column x rows format: header across top, ONE row of values
+
+        fig.add_trace(go.Table(
+            header=dict(values=['Parameter', 'Time']),
+            cells=dict(values=[table_header, table_values])
+        ),
+            row=1, col=2
+        )
+
+        fig.update_layout(
+            margin=dict(l=40, r=20, t=30, b=30),
+            showlegend=False
         )
 
         return fig.to_html(
