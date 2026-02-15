@@ -1,74 +1,9 @@
 import numpy as np
 from numba import njit
-from strategytester5 import MetaTrader5
+from . import MetaTrader5
 from scipy.stats import linregress
-"""
-@njit(cache=True)
-def _maximal_drawdown_local_extrema_nb(x: np.ndarray, eps: float = 1e-12) -> float:
-    \"""
-    MT5-style maximal drawdown:
-      max over local maxima (peak - next local minimum after that peak)
-
-    Numba-optimized:
-      - preallocates peaks/troughs arrays
-      - uses counters instead of Python lists
-      - plateau handling (flat runs)
-    \"""
-    n = x.size
-    if n < 3:
-        return 0.0
-
-    # Worst-case: every point is an extremum
-    peaks = np.empty(n, dtype=np.int64)
-    troughs = np.empty(n, dtype=np.int64)
-    pcount = 0
-    tcount = 0
-
-    i = 1
-    while i < n - 1:
-        left = x[i - 1]
-        mid = x[i]
-
-        # Expand plateau: [i .. j]
-        j = i
-        while j < n - 1 and abs(x[j] - x[j + 1]) <= eps:
-            j += 1
-
-        right = x[j + 1] if j < n - 1 else x[j]
-
-        if mid > left + eps and mid > right + eps:
-            peaks[pcount] = i
-            pcount += 1
-        elif mid < left - eps and mid < right - eps:
-            troughs[tcount] = i
-            tcount += 1
-
-        i = j + 1
-
-    if pcount == 0 or tcount == 0:
-        return 0.0
-
-    # Compute max drawdown: for each peak, find next trough after it
-    max_dd = 0.0
-    t_idx = 0
-
-    for pi in range(pcount):
-        p = peaks[pi]
-
-        # Advance trough pointer to first trough after this peak
-        while t_idx < tcount and troughs[t_idx] <= p:
-            t_idx += 1
-
-        if t_idx >= tcount:
-            break
-
-        t = troughs[t_idx]
-        dd = x[p] - x[t]
-        if dd > max_dd:
-            max_dd = dd
-
-    return max_dd if max_dd > 0.0 else 0.0
-"""
+import pandas as pd
+from strategytester5.mt5.constants import DEAL_ENTRY_IN, DEAL_ENTRY_OUT, DEAL_TYPE_SELL, DEAL_TYPE_BUY
 
 @njit(cache=True)
 def _max_dd_money_and_pct_nb(x: np.ndarray, eps: float = 1e-12):
@@ -466,26 +401,6 @@ class TesterStats:
 
     # ---------- AHPR / GHPR ----------
 
-    """
-    @property
-    def ahpr(self) -> float:
-
-        \""" arithmetic mean of trade returns (fraction). In report they also show % in brackets.\"""
-
-        r = np.asarray(self._trade_returns, dtype=np.float64)
-        return float(np.mean(r)) if r.size else 0.0
-
-    @property
-    def ghpr(self) -> float:
-        \""" geometric mean of trade returns (fraction)\"""
-
-        r = np.asarray(self._trade_returns, dtype=np.float64)
-        if r.size == 0:
-            return 0.0
-        g = float(np.prod(1.0 + r) ** (1.0 / r.size) - 1.0)
-        return g
-    """
-
     @property
     def ahpr_factor(self) -> float:
         r = np.asarray(self._trade_returns, dtype=np.float64)
@@ -523,3 +438,56 @@ class TesterStats:
     @property
     def margin_level(self) -> float:
         return np.min(self.margin_level_curve) if len(self.margin_level_curve)>0 else np.nan
+
+
+class EntriesCalculator:
+    def __init__(self, deals_df: pd.DataFrame):
+        self.deals_df = deals_df.query(f"entry=={DEAL_ENTRY_IN} and (type=={DEAL_TYPE_SELL} or type=={DEAL_TYPE_BUY})").copy()
+
+        self.deals_df["hour"] = self.deals_df["time"].dt.hour
+        self.deals_df["weekday"] = self.deals_df["time"].dt.weekday
+        self.deals_df["month"] = self.deals_df["time"].dt.month
+
+    def by_hour(self) -> pd.Series:
+        return self.deals_df.groupby("hour")["entry"].size().reindex(range(24), fill_value=0)
+
+    def by_weekday(self) -> pd.Series:
+        return self.deals_df.groupby("weekday")["entry"].size().reindex(range(7), fill_value=0)
+
+    def by_month(self) -> pd.Series:
+        return self.deals_df.groupby("month")["entry"].size().reindex(range(12), fill_value=0)
+
+
+class PLCalculator:
+    def __init__(self, deals_df: pd.DataFrame):
+
+        self.deals_df = deals_df.query(f"entry == {DEAL_ENTRY_OUT} and (type=={DEAL_TYPE_BUY} | type=={DEAL_TYPE_SELL})").copy()
+
+        self.deals_df["hour"] = self.deals_df["time"].dt.hour
+        self.deals_df["weekday"] = self.deals_df["time"].dt.weekday
+        self.deals_df["month"] = self.deals_df["time"].dt.month
+
+        net = (self.deals_df["profit"] + self.deals_df["commission"])
+
+        self.deals_df["profit"] = net.clip(lower=0.0)
+        self.deals_df["loss"] = net.clip(upper=0.0)
+
+        print(f"total profits: {self.deals_df['profit'].sum()} losses: {self.deals_df['loss'].sum()}")
+
+    def loss_by_hour(self) -> pd.Series:
+        return self.deals_df.groupby("hour")["loss"].sum().reindex(range(24), fill_value=0)
+
+    def profit_by_hour(self) -> pd.Series:
+        return self.deals_df.groupby("hour")["profit"].sum().reindex(range(24), fill_value=0)
+
+    def loss_by_weekday(self) -> pd.Series:
+        return self.deals_df.groupby("weekday")["loss"].sum().reindex(range(7), fill_value=0)
+
+    def profit_by_weekday(self) -> pd.Series:
+        return self.deals_df.groupby("weekday")["profit"].sum().reindex(range(7), fill_value=0)
+
+    def loss_by_month(self) -> pd.Series:
+        return self.deals_df.groupby("month")["loss"].sum().reindex(range(12), fill_value=0)
+
+    def profit_by_month(self) -> pd.Series:
+        return self.deals_df.groupby("month")["profit"].sum().reindex(range(12), fill_value=0)
