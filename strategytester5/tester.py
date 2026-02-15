@@ -24,7 +24,11 @@ import sys
 import logging
 import glob
 from tqdm import tqdm
+
 import matplotlib as mpl
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
 from pathlib import Path
 
 mpl.rcParams["agg.path.chunksize"] = 10000
@@ -2222,10 +2226,6 @@ class StrategyTester:
         self._save_trading_history(self.trading_history_dir)
 
     def _plot_tester_curves_plotly(self) -> str | None:
-        try:
-            import plotly.graph_objects as go
-        except ImportError:
-            raise ImportError("Plotly not installed. Run: pip install plotly")
 
         curves = self.tester_curves
         n = int(self.CURVES_IDX)
@@ -2297,15 +2297,15 @@ class StrategyTester:
 
         return fig.to_html(
             full_html=False,
-            include_plotlyjs="cdn",
+            # include_plotlyjs="cdn",
             config={"responsive": True}
         )
 
     def __GenerateTesterReport(self, output_file="StrategyTester report.html"):
 
-        curve_block = ""  # <-- what we inject into {{CURVE_IMAGE}}
+        curve_block_html = ""  # <-- what we inject into {{CURVE_IMAGE}}
         try:
-            curve_block = self._plot_tester_curves_plotly() or ""
+            curve_block_html = self._plot_tester_curves_plotly() or ""
         except Exception as e:
             self.logger.warning(f"Failed to generate interactive curve (plotly): {e!r}")
 
@@ -2327,12 +2327,17 @@ class StrategyTester:
         order_rows_html = templates.render_order_rows(self.__orders_history_container__)
         deal_rows_html = templates.render_deal_rows(self.__deals_history_container__)
 
+        deals_df = pd.DataFrame(self.__deals_history_container__)
+        deals_df["time"] = pd.to_datetime(deals_df["time"], unit="s", errors="coerce")
+        positions_stats_html = self._entries_and_pl_plotly(deals_df)
+
         html = (
             base_template
             .replace("{{STATS_TABLE}}", stats_table)
             .replace("{{ORDER_ROWS}}", order_rows_html)
             .replace("{{DEAL_ROWS}}", deal_rows_html)
-            .replace("{{CURVE_IMAGE}}", curve_block)  # now supports both
+            .replace("{{CURVE_IMAGE}}", curve_block_html)
+            .replace("{{POSITION_STATS_IMAGE}}", positions_stats_html)
         )
 
         with open(output_file, "w", encoding="utf-8") as f:
@@ -2358,3 +2363,80 @@ class StrategyTester:
 
         except Exception as e:
             self.logger.warning(f"Failed to save trading history: {e!r}")
+
+    def _entries_and_pl_plotly(self, deals_df: pd.DataFrame):
+
+        WEEKDAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        # ---- calculators ----
+
+        entries = stats.EntriesCalculator(deals_df)
+        pl = stats.PLCalculator(deals_df)
+
+        entries_hour = entries.by_hour()
+        entries_wd = entries.by_weekday()
+        entries_mon = entries.by_month().reindex(range(1, 13), fill_value=0)
+
+        entries_wd.index = WEEKDAY_ORDER
+        entries_mon.index = MONTH_ORDER
+
+        p_hour, l_hour = pl.profit_by_hour(), pl.loss_by_hour()
+        p_wd, l_wd = pl.profit_by_weekday(), pl.loss_by_weekday()
+        p_mon, l_mon = pl.profit_by_month(), pl.loss_by_month()
+
+        p_wd.index = WEEKDAY_ORDER
+        l_wd.index = WEEKDAY_ORDER
+        p_mon.index = MONTH_ORDER
+        l_mon.index = MONTH_ORDER
+
+        # ---- plot ----
+        fig = make_subplots(
+            rows=2, cols=3,
+            subplot_titles=(
+                "Entries by hours",
+                "Entries by weekdays",
+                "Entries by months",
+                "Profit & loss by hours",
+                "Profit & loss by weekdays",
+                "Profit & loss by months"
+            )
+        )
+
+        # Row 1: Entries
+        fig.add_trace(go.Bar(x=list(entries_hour.index), y=entries_hour.values, name="Entries"),
+                      row=1, col=1)
+
+        fig.add_trace(go.Bar(x=list(entries_wd.index), y=entries_wd.values, name="Entries", showlegend=False),
+                      row=1, col=2)
+
+        fig.add_trace(go.Bar(x=list(entries_mon.index), y=entries_mon.values, name="Entries", showlegend=False),
+                      row=1, col=3)
+
+        # Row 2: Profit & Loss (side-by-side like matplotlib version)
+        fig.add_trace(go.Bar(x=[str(i) for i in range(24)], y=p_hour.values, name="Profit"),
+                      row=2, col=1)
+        fig.add_trace(go.Bar(x=[str(i) for i in range(24)], y=l_hour.values, name="Loss"),
+                      row=2, col=1)
+
+        fig.add_trace(go.Bar(x=WEEKDAY_ORDER, y=p_wd.values, name="Profit", showlegend=False),
+                      row=2, col=2)
+        fig.add_trace(go.Bar(x=WEEKDAY_ORDER, y=l_wd.values, name="Loss", showlegend=False),
+                      row=2, col=2)
+
+        fig.add_trace(go.Bar(x=MONTH_ORDER, y=p_mon.values, name="Profit", showlegend=False),
+                      row=2, col=3)
+        fig.add_trace(go.Bar(x=MONTH_ORDER, y=l_mon.values, name="Loss", showlegend=False),
+                      row=2, col=3)
+
+        fig.update_layout(
+            barmode="group",  # side-by-side exactly like your matplotlib version
+            margin=dict(l=80, r=20, t=30, b=40),
+            showlegend=False,
+        )
+
+        return fig.to_html(
+            full_html=False,
+            # include_plotlyjs="cdn",
+            config={"responsive": True}
+        )
