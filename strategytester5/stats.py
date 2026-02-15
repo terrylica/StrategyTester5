@@ -439,6 +439,22 @@ class TesterStats:
     def margin_level(self) -> float:
         return np.min(self.margin_level_curve) if len(self.margin_level_curve)>0 else np.nan
 
+    @staticmethod
+    def holding_time_calculator(entry_time: pd.Series, exit_time: pd.Series) -> dict:
+
+        durations = exit_time - entry_time
+
+        if durations.empty:
+            return {"min": None, "max": None, "avg": None, "count": 0}
+
+        return {
+            "time": exit_time,
+            "durations": durations,
+            "count": int(len(durations)),
+            "min": durations.min(),
+            "max": durations.max(),
+            "avg": durations.mean(),
+        }
 
 class EntriesCalculator:
     def __init__(self, deals_df: pd.DataFrame):
@@ -471,8 +487,6 @@ class PLCalculator:
 
         self.deals_df["profit"] = net.clip(lower=0.0)
         self.deals_df["loss"] = net.clip(upper=0.0)
-
-        print(f"total profits: {self.deals_df['profit'].sum()} losses: {self.deals_df['loss'].sum()}")
 
     def loss_by_hour(self) -> pd.Series:
         return self.deals_df.groupby("hour")["loss"].sum().reindex(range(24), fill_value=0)
