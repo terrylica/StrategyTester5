@@ -22,7 +22,9 @@ dependencies = [
   "tqdm",
   "numba",
   "scipy",
-  "plotly"
+  "plotly",
+  "kaleido",
+  "nbformat"
 ]
 
 keywords = [
