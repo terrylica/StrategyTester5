@@ -1,5 +1,5 @@
-from strategytester5 import datetime, ORDER_TYPE_MAP, ORDER_STATE_MAP, DEAL_ENTRY_MAP, DEAL_TYPE_MAP
-from strategytester5.stats import TesterStats
+from . import datetime, ORDER_TYPE_MAP, ORDER_STATE_MAP, DEAL_ENTRY_MAP, DEAL_TYPE_MAP
+from .stats import TesterStats
 
 def html_report_template() -> str:
     return """
@@ -98,14 +98,6 @@ def html_report_template() -> str:
                 width: 100%;
                 height: 420px;          /* adjust as you like */
                 border: 0;
-                display: block;
-            }
-        
-            /* If you still use PNG fallback */
-            .curve-img{
-                width: 100%;
-                max-height: 420px;
-                object-fit: contain;
                 display: block;
             }
     
@@ -209,6 +201,12 @@ def html_report_template() -> str:
             </div>
         </div>
     
+        <div class="section">
+            <div class="curve-wrapper">
+                {{POSITION_STATS_IMAGE}}
+            </div>
+        </div>
+        
         <h4>Orders</h4>
         <div class="section table-responsive">
             <table class="table table-sm table-striped align-middle">
