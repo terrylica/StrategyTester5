@@ -1,106 +1,283 @@
-import MetaTrader5 as mt5
-from datetime import datetime
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Optional, Union
+from . import StrategyTester
+from .. import MetaTrader5, TradeDeal
 
 class CDealInfo:
-    def __init__(self):
-        self._deal = None
-        self._ticket = 0
+    def __init__(self, deal: TradeDeal, terminal: Union[StrategyTester|MetaTrader5]):
+        """
+        CDealInfo
+        ---------
+        A lightweight Python wrapper that resembles the MQL5 Standard Library class
+        `CDealInfo` and provides convenient, read-only access to MetaTrader 5 deal
+        properties.
 
-    def _deal_type_description(self):
+        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cdealinfo
+        
+        Parameters
+        ----------
+        
+        deal (tuple) : A deal object (e.g., from `mt5.history_deals_get()`) to wrap and provide access to.
+        
+        terminal (optional) : MetaTrader5 module-like or StrategyTester.
+
+        Notes
+        -----
+        - Many getters return `None` if no deal is selected.
+        - Times:
+            * `time` returns a timezone-aware UTC datetime (recommended for MT5 history).
+            * `time_msc` returns milliseconds since 1970-01-01 (UTC) when available.
+        - This wrapper does not modify terminal state; it only reads/derives properties.
+        """
+
+        self.terminal = terminal
+        if isinstance(terminal, StrategyTester):
+            self.terminal = terminal.mt5_instance
+
+        self._deal = deal
+        
+        if self._deal is None:
+            raise ValueError("Deal cannot be None. Please provide a valid deal tuple.")
+        
+    @property
+    def deal_type_description(self):
+        """Gets the deal type as a string"""
+
         if not self._deal:
             return "N/A"
+        
         deal_type_map = {
-            mt5.DEAL_TYPE_BUY: "BUY",
-            mt5.DEAL_TYPE_SELL: "SELL",
-            mt5.DEAL_TYPE_BALANCE: "BALANCE",
-            mt5.DEAL_TYPE_CREDIT: "CREDIT",
-            mt5.DEAL_TYPE_CHARGE: "CHARGE",
-            mt5.DEAL_TYPE_CORRECTION: "CORRECTION",
-            mt5.DEAL_TYPE_BONUS: "BONUS",
-            mt5.DEAL_TYPE_COMMISSION: "COMMISSION",
-            mt5.DEAL_TYPE_COMMISSION_DAILY: "COMMISSION DAILY",
-            mt5.DEAL_TYPE_COMMISSION_MONTHLY: "COMMISSION MONTHLY",
-            mt5.DEAL_TYPE_COMMISSION_AGENT_DAILY: "AGENT COMMISSION DAILY",
-            mt5.DEAL_TYPE_COMMISSION_AGENT_MONTHLY: "AGENT COMMISSION MONTHLY",
-            mt5.DEAL_TYPE_INTEREST: "INTEREST",
-            mt5.DEAL_TYPE_BUY_CANCELED: "BUY CANCELED",
-            mt5.DEAL_TYPE_SELL_CANCELED: "SELL CANCELED"
+            self.terminal.DEAL_TYPE_BUY: "BUY",
+            self.terminal.DEAL_TYPE_SELL: "SELL",
+            self.terminal.DEAL_TYPE_BALANCE: "BALANCE",
+            self.terminal.DEAL_TYPE_CREDIT: "CREDIT",
+            self.terminal.DEAL_TYPE_CHARGE: "CHARGE",
+            self.terminal.DEAL_TYPE_CORRECTION: "CORRECTION",
+            self.terminal.DEAL_TYPE_BONUS: "BONUS",
+            self.terminal.DEAL_TYPE_COMMISSION: "COMMISSION",
+            self.terminal.DEAL_TYPE_COMMISSION_DAILY: "COMMISSION DAILY",
+            self.terminal.DEAL_TYPE_COMMISSION_MONTHLY: "COMMISSION MONTHLY",
+            self.terminal.DEAL_TYPE_COMMISSION_AGENT_DAILY: "AGENT COMMISSION DAILY",
+            self.terminal.DEAL_TYPE_COMMISSION_AGENT_MONTHLY: "AGENT COMMISSION MONTHLY",
+            self.terminal.DEAL_TYPE_INTEREST: "INTEREST",
+            self.terminal.DEAL_TYPE_BUY_CANCELED: "BUY CANCELED",
+            self.terminal.DEAL_TYPE_SELL_CANCELED: "SELL CANCELED"
         }
+        
         return deal_type_map.get(self._deal.type, f"UNKNOWN({self._deal.type})")
 
-    # --- selection
-
-    def select_deal(self, deal) -> bool:
-        
-        if deal is None:
-            return False
-    
-        self._deal = deal
-        return True
-    
-    # --- Integer, datetime & string properties
-    
-    def ticket(self):
-        return self._ticket
-
-    def order(self):
-        return self._deal.order if self._deal else None
-
-    def time(self):
-        return datetime.fromtimestamp(self._deal.time) if self._deal else None
-
-    def time_msc(self):
-        return self._deal.time_msc if self._deal else None
-
-    def deal_type(self):
-        return self._deal.type if self._deal else None
-
-    def type_description(self):
-        return self._deal_type_description() if self._deal else "N/A"
-
-    def entry(self):
-        return self._deal.entry if self._deal else None
-
+    @property
     def entry_description(self):
+        """Gets the deal direction as a string"""
+
         if not self._deal:
             return "N/A"
+
         entry_map = {
-            mt5.DEAL_ENTRY_IN: "IN",
-            mt5.DEAL_ENTRY_OUT: "OUT",
-            mt5.DEAL_ENTRY_INOUT: "INOUT"
+            self.terminal.DEAL_ENTRY_IN: "IN",
+            self.terminal.DEAL_ENTRY_OUT: "OUT",
+            self.terminal.DEAL_ENTRY_INOUT: "INOUT"
         }
+
         return entry_map.get(self._deal.entry, "UNKNOWN")
 
-    def magic(self):
-        return self._deal.magic if self._deal else None
+    # --- Integer, datetime & properties
 
-    def position_id(self):
-        return self._deal.position_id if self._deal else None
+    @property
+    def ticket(self) -> Optional[int]:
+        """Gets ticket/selects the deal ticket."""
+        return None if self._deal is None else int(self._deal.ticket)
 
-    # --- Double properties
+    @property
+    def order(self) -> Optional[int]:
+        """Gets the order by which the deal was executed."""
+        return None if self._deal is None else int(self._deal.order)
+
+    @property
+    def time(self) -> Optional[datetime]:
+        """
+        Gets the time of deal execution as a timezone-aware UTC datetime.
+
+        Returns
+        -------
+        Optional[datetime]
+            UTC datetime, or None if no deal is selected.
+        """
+        if self._deal is None:
+            return None
+        # MT5 history times are effectively UTC; keep it explicit.
+        return datetime.fromtimestamp(int(self._deal.time), tz=timezone.utc)
+
+    @property
+    def time_msc(self) -> Optional[int]:
+        """Receives the time of a deal execution in milliseconds since 1970-01-01 (UTC)."""
+        return None if self._deal is None else int(self._deal.time_msc)
+
+    @property
+    def deal_type(self) -> Optional[int]:
+        """Gets the deal type (DEAL_TYPE_*)."""
+        return None if self._deal is None else int(self._deal.type)
+
+    @property
+    def type_description(self) -> str:
+        """Gets the deal type as a string."""
+        
+        if self._deal is None:
+            return "N/A"
+        
+        deal_type_map ={
+            self.terminal.DEAL_TYPE_BUY: "BUY",
+            self.terminal.DEAL_TYPE_SELL: "SELL",
+            self.terminal.DEAL_TYPE_BALANCE: "BALANCE",
+            self.terminal.DEAL_TYPE_CREDIT: "CREDIT",
+            self.terminal.DEAL_TYPE_CHARGE: "CHARGE",
+            self.terminal.DEAL_TYPE_CORRECTION: "CORRECTION",
+            self.terminal.DEAL_TYPE_BONUS: "BONUS",
+            self.terminal.DEAL_TYPE_COMMISSION: "COMMISSION",
+            self.terminal.DEAL_TYPE_COMMISSION_DAILY: "COMMISSION DAILY",
+            self.terminal.DEAL_TYPE_COMMISSION_MONTHLY: "COMMISSION MONTHLY",
+            self.terminal.DEAL_TYPE_COMMISSION_AGENT_DAILY: "AGENT COMMISSION DAILY",
+            self.terminal.DEAL_TYPE_COMMISSION_AGENT_MONTHLY: "AGENT COMMISSION MONTHLY",
+            self.terminal.DEAL_TYPE_INTEREST: "INTEREST",
+            self.terminal.DEAL_TYPE_BUY_CANCELED: "BUY CANCELED",
+            self.terminal.DEAL_TYPE_SELL_CANCELED: "SELL CANCELED",
+        }
+
+        return deal_type_map.get(self._deal.type, f"UNKNOWN({self._deal.type})")
+
+    @property
+    def entry(self) -> Optional[int]:
+        """Gets the deal direction/entry (DEAL_ENTRY_*)."""
+        return None if self._deal is None else int(self._deal.entry)
+
+    @property
+    def magic(self) -> Optional[int]:
+        """Gets the ID of the expert (magic number) that executed the deal."""
+        return None if self._deal is None else int(self._deal.magic)
+
+    @property
+    def position_id(self) -> Optional[int]:
+        """Gets the ID of the position in which the deal was involved."""
+        return None if self._deal is None else int(self._deal.position_id)
+
+    # Double properties
+
+    @property
+    def volume(self) -> Optional[float]:
+        """Gets the volume of the deal."""
+        return None if self._deal is None else float(self._deal.volume)
+
+    @property
+    def price(self) -> Optional[float]:
+        """Gets the deal price."""
+        return None if self._deal is None else float(self._deal.price)
+
+    @property
+    def commission(self) -> Optional[float]:
+        """Gets the amount of commission for the deal."""
+        return None if self._deal is None else float(self._deal.commission)
+
+    @property
+    def swap(self) -> Optional[float]:
+        """Gets the amount of swap when the position is closed."""
+        return None if self._deal is None else float(self._deal.swap)
+
+    @property
+    def profit(self) -> Optional[float]:
+        """Gets the financial result of the deal."""
+        return None if self._deal is None else float(self._deal.profit)
+
+    # Text properties
+
+    @property
+    def symbol(self) -> Optional[str]:
+        """Gets the symbol name."""
+        return None if self._deal is None else str(self._deal.symbol)
+
+    @property
+    def comment(self) -> Optional[str]:
+        """Gets the deal comment."""
+        return None if self._deal is None else str(self._deal.comment)
+
+    @property
+    def external_id(self) -> Optional[str]:
+        """Gets the external ID (if provided by the broker)."""
+        return None if self._deal is None else str(self._deal.external_id)
+
+    # -------------------------
+    # Generic "Info*" methods (MQL5-like)
+    # -------------------------
+
+    def info_integer(self, prop_name: str) -> Optional[int]:
+        """
+        Gets an integer property value by attribute name.
+
+        This is a Pythonic approximation of MQL5's InfoInteger/HistoryDealGetInteger.
+        In Python MT5, deal objects expose fields as attributes.
+
+        Parameters
+        ----------
+        prop_name : str
+            Attribute name on the deal object (e.g., "ticket", "order", "magic").
+
+        Returns
+        -------
+        Optional[int]
+            The integer value, or None if no deal is selected or attribute missing.
+        """
+        if self._deal is None or not hasattr(self._deal, prop_name):
+            return None
+        value = getattr(self._deal, prop_name)
+        return None if value is None else int(value)
+
+    def info_double(self, prop_name: str) -> Optional[float]:
+        """
+        Gets a float property value by attribute name.
+
+        Parameters
+        ----------
+        prop_name : str
+            Attribute name on the deal object (e.g., "price", "profit", "volume").
+
+        Returns
+        -------
+        Optional[float]
+            The float value, or None if no deal is selected or attribute missing.
+        """
+        if self._deal is None or not hasattr(self._deal, prop_name):
+            return None
+        value = getattr(self._deal, prop_name)
+        return None if value is None else float(value)
+
+    def info_string(self, prop_name: str) -> Optional[str]:
+        """
+        Gets a string property value by attribute name.
+
+        Parameters
+        ----------
+        prop_name : str
+            Attribute name on the deal object (e.g., "symbol", "comment", "external_id").
+
+        Returns
+        -------
+        Optional[str]
+            The string value, or None if no deal is selected or attribute missing.
+        """
+        if self._deal is None or not hasattr(self._deal, prop_name):
+            return None
+        value = getattr(self._deal, prop_name)
+        return None if value is None else str(value)
     
-    def volume(self):
-        return self._deal.volume if self._deal else None
-
-    def price(self):
-        return self._deal.price if self._deal else None
-
-    def commission(self):
-        return self._deal.commission if self._deal else None
-
-    def swap(self):
-        return self._deal.swap if self._deal else None
-
-    def profit(self):
-        return self._deal.profit if self._deal else None
-
-    # --- Text properties
-    
-    def symbol(self):
-        return self._deal.symbol if self._deal else None
-
-    def comment(self):
-        return self._deal.comment if self._deal else None
-
-    def external_id(self):
-        return self._deal.external_id if self._deal else None
+    def print_all(self) -> None:
+        """Print all @property values of the class."""
+        
+        for name, attr in vars(type(self)).items():
+            if isinstance(attr, property):
+                try:
+                    value = getattr(self, name)
+                except Exception as e:
+                    value = f"<error: {e}>"
+                
+                print(f"{name:20} : {value}")

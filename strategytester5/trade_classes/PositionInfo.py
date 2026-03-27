@@ -1,108 +1,249 @@
-import MetaTrader5 as mt5
-from datetime import datetime
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Optional, Union
+from . import StrategyTester
+from .. import MetaTrader5, TradePosition
 
 class CPositionInfo:
-    def __init__(self):
-        self._position = None
-    
-    def select_position(self, position) -> bool:
+    def __init__(self, position: TradePosition, terminal: Union[MetaTrader5|StrategyTester]) -> None:
         
-        if position is None:
-            return False
-        else:
-            self._position = position
-            return True
-    
-    """
-    def select_by_ticket(self, ticket: int) -> bool:
-        
-        positions = mt5.positions_get(ticket=ticket)
-        if positions:
-            self._position = positions[0]
-            return True
-        return False
+        """
+        CPositionInfo
+        -------------
+        A lightweight Python wrapper that resembles the MQL5 Standard Library class
+        `CPositionInfo` and provides convenient, read-only access to MetaTrader 5
+        open position properties.
 
-    def select_by_magic(self, magic: int, symbol: str = None) -> bool:
-        
-        positions = mt5.positions_get()
-        if positions is None:
-            return False
-        for pos in positions:
-            if pos.magic == magic and (symbol is None or pos.symbol == symbol):
-                self._position = pos
-                return True
-        return False
+        This class wraps a single already-selected/open position object returned by
+        the MetaTrader 5 Python API, such as from `mt5.positions_get()`.
 
-    def select_by_index(self, index: int) -> bool:
-        
-        positions = mt5.positions_get()
-        if positions and 0 <= index < len(positions):
-            self._position = positions[index]
-            return True
-        return False
-    """
+        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cpositioninfo
 
+        Parameters
+        ----------
+        position : Any
+            A position object returned by MetaTrader 5 Python API functions such as
+            `mt5.positions_get()`.
+        terminal : MetaTrader5 module-like or the StrategyTester instance.
+
+        Notes
+        -----
+        - This wrapper does not implement selection methods by design.
+        - If no position is supplied, properties return fallback values such as
+        `-1`, `0.0`, `""`, or `None`, depending on the property.
+        - Time values are returned as timezone-aware UTC datetimes where applicable.
+
+        Method groups mirror the MQL5 layout:
+        - Integer properties: Time, TimeMsc, TimeUpdate, TimeUpdateMsc, PositionType, Magic, Identifier
+        - Double properties: Volume, PriceOpen, StopLoss, TakeProfit, PriceCurrent, Swap, Profit
+        - String properties: Symbol, Comment
+        - Generic accessors: InfoInteger, InfoDouble, InfoString
+        """
+        
+        self.terminal = terminal
+        if isinstance(terminal, StrategyTester):
+            self.terminal = terminal.mt5_instance
+
+        self._position: Optional[Any] = position
+        
+        if position is not None and not hasattr(position, "ticket"):
+            raise ValueError("The provided position object does not have expected attributes.")
+
+    # --------- Integer / datetime properties -----------
+
+    @property
     def ticket(self) -> int:
-        return self._position.ticket if self._position else -1
+        """Gets the ticket / identifier of the position."""
+        return int(self._position.ticket) if self._position else -1
 
+    @property
+    def identifier(self) -> int:
+        """Gets the ID of the position."""
+        return int(self._position.identifier) if self._position else -1
+
+    @property
     def magic(self) -> int:
-        return self._position.magic if self._position else -1
+        """Gets the ID of the expert that opened the position."""
+        return int(self._position.magic) if self._position else -1
 
-    def time(self) -> datetime:
-        return datetime.fromtimestamp(self._position.time) if self._position else None
+    @property
+    def time(self) -> Optional[datetime]:
+        """Gets the time of position opening."""
+        return datetime.fromtimestamp(self._position.time, tz=timezone.utc) if self._position else None
 
-    def time_msc(self) -> int:
-        return self._position.time_msc if self._position else None
-    
-    def time_update(self) -> datetime:
-        return datetime.fromtimestamp(self._position.time_update) if self._position else None
+    @property
+    def time_msc(self) -> Optional[int]:
+        """Receives the time of position opening in milliseconds since 01.01.1970."""
+        return int(self._position.time_msc) if self._position else None
 
-    def time_update_msc(self) -> int:
-        return self._position.time_update_msc if self._position else None
-    
+    @property
+    def time_update(self) -> Optional[datetime]:
+        """Receives the time of position changing in seconds since 01.01.1970."""
+        return datetime.fromtimestamp(self._position.time_update, tz=timezone.utc) if self._position else None
+
+    @property
+    def time_update_msc(self) -> Optional[int]:
+        """Receives the time of position changing in milliseconds since 01.01.1970."""
+        return int(self._position.time_update_msc) if self._position else None
+
+    @property
     def position_type(self) -> int:
-        return self._position.type if self._position else -1
+        """Gets the position type."""
+        return int(self._position.type) if self._position else -1
 
-    def position_type_description(self) -> int:
-        
+    @property
+    def position_type_description(self) -> str:
+        """Gets the position type as a string."""
         pos_type_map = {
-            mt5.POSITION_TYPE_BUY: "Buy",
-            mt5.POSITION_TYPE_SELL: "Sell"
+            self.terminal.POSITION_TYPE_BUY: "Buy",
+            self.terminal.POSITION_TYPE_SELL: "Sell"
         }
-        
-        return pos_type_map.get(self.position_type(), "Unknown position type")
-    
+        return pos_type_map.get(self.position_type, "Unknown position type")
+
+    # ----------- Double properties -------------
+
+    @property
     def volume(self) -> float:
-        return self._position.volume if self._position else 0.0
+        """Gets the volume of the position."""
+        return float(self._position.volume) if self._position else 0.0
 
+    @property
     def price_open(self) -> float:
-        return self._position.price_open if self._position else 0.0
+        """Gets the opening price of the position."""
+        return float(self._position.price_open) if self._position else 0.0
 
-    def symbol(self) -> str:
-        return self._position.symbol if self._position else ""
-
-    def profit(self) -> float:
-        return self._position.profit if self._position else 0.0
-
-    def swap(self) -> float:
-        return self._position.swap if self._position else 0.0
-
-    # def commission(self) -> float:
-    #     return self._position.commission if self._position else 0.0
-
-    def comment(self) -> str:
-        return self._position.comment if self._position else ""
-    
+    @property
     def stop_loss(self) -> float:
-        return self._position.sl if self._position else 0.0
+        """Gets the Stop Loss price of the position."""
+        return float(self._position.sl) if self._position else 0.0
 
+    @property
     def take_profit(self) -> float:
-        return self._position.tp if self._position else 0.0
+        """Gets the Take Profit price of the position."""
+        return float(self._position.tp) if self._position else 0.0
 
+    @property
     def price_current(self) -> float:
+        """Gets the current price by position symbol."""
+        return float(self._position.price_current) if self._position else 0.0
+
+    @property
+    def swap(self) -> float:
+        """Gets the swap amount of the position."""
+        return float(self._position.swap) if self._position else 0.0
+
+    @property
+    def profit(self) -> float:
+        """Gets the current profit of the position."""
+        return float(self._position.profit) if self._position else 0.0
+
+    # Optional: some MT5 Python position objects may not expose commission
+    @property
+    def commission(self) -> float:
+        """Gets the commission amount of the position, if available."""
         if not self._position:
             return 0.0
-        tick = mt5.symbol_info_tick(self._position.symbol)
-        if not tick:
-            return 0.0
-        return tick.bid if self._position.type == mt5.POSITION_TYPE_BUY else tick.ask
+        value = getattr(self._position, "commission", 0.0)
+        return float(value) if value is not None else 0.0
+
+    # ------------ String properties ------------
+
+    @property
+    def symbol(self) -> str:
+        """Gets the position symbol."""
+        return str(self._position.symbol) if self._position else ""
+
+    @property
+    def comment(self) -> str:
+        """Gets the comment of the position."""
+        return str(self._position.comment) if self._position else ""
+
+    # ------------ Generic Info* methods ------------
+
+    def info_integer(self, prop_name: str) -> Optional[int]:
+        """
+        Gets the value of a specified integer type property.
+
+        Parameters
+        ----------
+        prop_name : str
+            Name of the position attribute.
+
+        Returns
+        -------
+        Optional[int]
+            Integer value if present, otherwise None.
+        """
+        if self._position is None or not hasattr(self._position, prop_name):
+            return None
+        value = getattr(self._position, prop_name)
+        return None if value is None else int(value)
+
+    def info_double(self, prop_name: str) -> Optional[float]:
+        """
+        Gets the value of a specified double type property.
+
+        Parameters
+        ----------
+        prop_name : str
+            Name of the position attribute.
+
+        Returns
+        -------
+        Optional[float]
+            Float value if present, otherwise None.
+        """
+        if self._position is None or not hasattr(self._position, prop_name):
+            return None
+        value = getattr(self._position, prop_name)
+        return None if value is None else float(value)
+
+    def info_string(self, prop_name: str) -> Optional[str]:
+        """
+        Gets the value of a specified string type property.
+
+        Parameters
+        ----------
+        prop_name : str
+            Name of the position attribute.
+
+        Returns
+        -------
+        Optional[str]
+            String value if present, otherwise None.
+        """
+        if self._position is None or not hasattr(self._position, prop_name):
+            return None
+        value = getattr(self._position, prop_name)
+        return None if value is None else str(value)
+
+    # ---------- Debug / utility helpers --------------
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return all @property values as a dictionary."""
+        data: dict[str, Any] = {}
+        seen: set[str] = set()
+
+        for cls in type(self).mro():
+            for name, attr in vars(cls).items():
+                if name in seen:
+                    continue
+                if isinstance(attr, property):
+                    seen.add(name)
+                    try:
+                        data[name] = getattr(self, name)
+                    except Exception as e:
+                        data[name] = f"<error: {e}>"
+
+        return data
+
+    def print_all(self) -> None:
+        """Print all @property values of the class."""
+        for name, value in self.to_dict().items():
+            print(f"{name:24} : {value}")
+
+    def __repr__(self) -> str:
+        props = self.to_dict()
+        props_str = ", ".join(f"{k}={v!r}" for k, v in props.items())
+        return f"{self.__class__.__name__}({props_str})"
