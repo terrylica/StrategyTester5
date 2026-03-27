@@ -11,14 +11,12 @@ from .trade_validators import TradeValidators
 from strategytester5 import config
 from . import data
 import fnmatch
-from .vhs import Order, DatHistoryWriter
 from pathlib import Path
 
 class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def __init__(self,
                  logger: logging.Logger,
                  live_mt5: Any,
-                 optimization_mode: bool,
                  broker_data_path: Optional[str]=config.DEFAULT_BROKER_DATA_PATH,
                  polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto"
                  ):
@@ -28,7 +26,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         self.ac_info_json = Path(broker_data_path) / config.DEFAULT_ACCOUNT_INFO_JSON
         self.symbol_info_json = Path(broker_data_path) / config.DEFAULT_SYMBOL_INFO_JSON
         self.terminal_info_json = Path(broker_data_path) / config.DEFAULT_TERMINAL_INFO_JSON
-        self.optimization_mode = optimization_mode
 
         if live_mt5 is not None:
             # we export account information and all instrument info
@@ -78,10 +75,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         
         self.ACCOUNT = data.import_account_info(self.ac_info_json)
         self.TERMINAL_INFO = data.import_terminal_info(self.terminal_info_json)
-
-        self.visual_history = None
-        if not self.optimization_mode:
-            self.visual_history = DatHistoryWriter(dir=Path(self.TERMINAL_INFO.commondata_path) / "Files")
 
         self.ORDERS = []
         self.ORDERS_HISTORY = []
@@ -978,25 +971,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         # if this position comes from a pending order
         order_ticket = int(request.get("order", -1))
 
-        # record an order for visual purposes
-        v_order = Order(
-                time_current=time,
-                id=position.ticket,
-                action=1, # opening of an order action
-                was_pending=1 if order_ticket != -1 else 0, # 1 for true 0, false
-                type = order_type,
-                magic=position.magic,
-                volume=volume,
-                entry_price=price,
-                sl = sl,
-                tp = tp,
-                symbol=symbol,
-                comment=str(position.comment)
-            )
-
-        if not self.optimization_mode:
-            self.visual_history.write(v_order)
-
         self.logger.info(f"Position {deal.ticket} opened successfully!")
         return self._make_result(trade_request, retcode=self.TRADE_RETCODE_DONE, deal=deal.ticket, order=deal.order, volume=position.volume)
 
@@ -1124,25 +1098,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         self.DEALS.append(deal)
 
-        # ---------------- VISUAL HISTORY ----------------
-
-        v_order = Order(
-                time_current=time,
-                id=position.ticket,
-                action=2,  # closing
-                type=position.type,
-                magic=position.magic,
-                volume=volume,
-                entry_price=close_price,
-                sl=position.sl,
-                tp=position.tp,
-                symbol=symbol,
-                comment=str(position.comment),
-            )
-
-        if not self.optimization_mode:
-            self.visual_history.write(v_order)
-
         self.logger.info(f"Position {deal.ticket} closed successfully!")
         return self._make_result(
             trade_request,
@@ -1217,27 +1172,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
             if pos.ticket == position.ticket:
                 self.POSITIONS[i] = updated_position
                 break
-
-        # ---------------- VISUAL HISTORY ----------------
-
-        time = tick.time
-
-        v_order = Order(
-                time_current=time,
-                id=position.ticket,
-                action=3,  # modification
-                type=position.type,
-                magic=position.magic,
-                volume=position.volume,
-                entry_price=position.price_open,
-                sl=updated_position.sl,
-                tp=updated_position.tp,
-                symbol=symbol,
-                comment=str(position.comment),
-            )
-
-        if not self.optimization_mode:
-            self.visual_history.write(v_order)
 
         self.logger.info(f"Position {position.ticket} modified successfully!")
 
@@ -1327,26 +1261,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         # store history of orders
         self.ORDERS_HISTORY.append(order)
-
-        # ---------------- VISUAL HISTORY ----------------
-
-        v_order = Order(
-                time_current=tick_time,
-                id=order.ticket,
-                action=1,  # opening
-                type=order.type,
-                magic=order.magic,
-                volume=volume,
-                entry_price=price,
-                sl=sl,
-                tp=tp,
-                symbol=symbol,
-                comment=order.comment,
-            )
-
-        if not self.optimization_mode:
-            self.visual_history.write(v_order)
-
         self.logger.info(f"Pending order {order.ticket} created successfully!")
 
         return self._make_result(
@@ -1444,25 +1358,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         time = tick.time
 
-        v_order = Order(
-                    time_current=time,
-                    id=order.ticket,
-                    action=3,  # modification
-                    was_pending=0,
-                    type=order.type,
-                    magic=order.magic,
-                    volume=order.volume_current,
-                    entry_price=updated_order.price_open,
-                    sl=updated_order.sl,
-                    tp=updated_order.tp,
-                    symbol=symbol,
-                    comment=order.comment,
-                )
-
-        # print("v_history: \n",v_order)
-        if not self.optimization_mode:
-            self.visual_history.write(v_order)
-
         self.logger.info(f"Pending order {order.ticket} modified successfully!")
 
         return self._make_result(
@@ -1519,27 +1414,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         # ---------------- OPTIONAL: STORE HISTORY ----------------
 
         self.ORDERS_HISTORY.append(canceled_order)
-
-        # ---------------- VISUAL HISTORY ----------------
-
-        v_order = Order(
-                    time_current=time,
-                    id=order.ticket,
-                    action=2,  # treat as "closing/removal"
-                    was_pending=0,
-                    type=order.type,
-                    magic=order.magic,
-                    volume=order.volume_current,
-                    entry_price=order.price_open,
-                    sl=order.sl,
-                    tp=order.tp,
-                    symbol=order.symbol,
-                    comment=order.comment,
-                )
-
-        if not self.optimization_mode:
-            self.visual_history.write(v_order)
-
         self.logger.info(f"Pending order {order.ticket} deleted successfully!")
 
         return self._make_result(
