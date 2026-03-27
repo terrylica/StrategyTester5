@@ -1,9 +1,12 @@
 import numpy as np
 from numba import njit
-from . import MetaTrader5
+from .MetaTrader5.api import MetaTrader5Constants
 from scipy.stats import linregress
 import pandas as pd
-from strategytester5.mt5.constants import DEAL_ENTRY_IN, DEAL_ENTRY_OUT, DEAL_TYPE_SELL, DEAL_TYPE_BUY
+import warnings
+
+# np.seterr(all="raise")  # turn numpy warnings into exceptions
+# warnings.filterwarnings("error")
 
 @njit(cache=True)
 def _max_dd_money_and_pct_nb(x: np.ndarray, eps: float = 1e-12):
@@ -127,15 +130,15 @@ class TesterStats:
         cur_loss_money = 0.0
 
         for d in self.deals:
-            if getattr(d, "entry", None) != MetaTrader5.DEAL_ENTRY_OUT:
+            if getattr(d, "entry", None) != MetaTrader5Constants.DEAL_ENTRY_OUT:
                 continue
 
             self._total_trades += 1
 
             d_type = d.type
-            if d_type == MetaTrader5.DEAL_TYPE_BUY:
+            if d_type == MetaTrader5Constants.DEAL_TYPE_BUY:
                 self._total_long_trades += 1
-            elif d_type == MetaTrader5.DEAL_TYPE_SELL:
+            elif d_type == MetaTrader5Constants.DEAL_TYPE_SELL:
                 self._total_short_trades += 1
 
             profit = d.profit + d.commission
@@ -168,9 +171,9 @@ class TesterStats:
                     self._max_profit_streak_money = cur_win_money
                     self._max_profit_streak_count = cur_win_count
 
-                if d_type == MetaTrader5.DEAL_TYPE_BUY:
+                if d_type == MetaTrader5Constants.DEAL_TYPE_BUY:
                     self._long_trades_won += 1
-                elif d_type == MetaTrader5.DEAL_TYPE_SELL:
+                elif d_type == MetaTrader5Constants.DEAL_TYPE_SELL:
                     self._short_trades_won += 1
 
             else:
@@ -374,7 +377,7 @@ class TesterStats:
 
         seq = []
         for d in self.deals:
-            if getattr(d, "entry", None) != MetaTrader5.DEAL_ENTRY_OUT:
+            if getattr(d, "entry", None) != MetaTrader5Constants.DEAL_ENTRY_OUT:
                 continue
             seq.append(1 if float(getattr(d, "profit", 0.0)) > 0.0 else 0)
 
@@ -458,7 +461,7 @@ class TesterStats:
 
 class EntriesCalculator:
     def __init__(self, deals_df: pd.DataFrame):
-        self.deals_df = deals_df.query(f"entry=={DEAL_ENTRY_IN} and (type=={DEAL_TYPE_SELL} or type=={DEAL_TYPE_BUY})").copy()
+        self.deals_df = deals_df.query(f"entry=={MetaTrader5Constants.DEAL_ENTRY_IN} and (type=={MetaTrader5Constants.DEAL_TYPE_SELL} or type=={MetaTrader5Constants.DEAL_TYPE_BUY})").copy()
 
         self.deals_df["hour"] = self.deals_df["time"].dt.hour
         self.deals_df["weekday"] = self.deals_df["time"].dt.weekday
@@ -477,7 +480,7 @@ class EntriesCalculator:
 class PLCalculator:
     def __init__(self, deals_df: pd.DataFrame):
 
-        self.deals_df = deals_df.query(f"entry == {DEAL_ENTRY_OUT} and (type=={DEAL_TYPE_BUY} | type=={DEAL_TYPE_SELL})").copy()
+        self.deals_df = deals_df.query(f"entry == {MetaTrader5Constants.DEAL_ENTRY_OUT} and (type=={MetaTrader5Constants.DEAL_TYPE_BUY} | type=={MetaTrader5Constants.DEAL_TYPE_SELL})").copy()
 
         self.deals_df["hour"] = self.deals_df["time"].dt.hour
         self.deals_df["weekday"] = self.deals_df["time"].dt.weekday
