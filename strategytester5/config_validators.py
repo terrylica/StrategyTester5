@@ -112,6 +112,5 @@ class TesterConfigValidators:
 
         # --- LEVERAGE ---
         cfg["leverage"] = TesterConfigValidators._parse_leverage(raw_config["leverage"])
-        cfg["visual_mode"] = raw_config["visual_mode"]
 
         return cfg
