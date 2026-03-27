@@ -1,4 +1,5 @@
-from . import datetime, ORDER_TYPE_MAP, ORDER_STATE_MAP, DEAL_ENTRY_MAP, DEAL_TYPE_MAP
+from .MetaTrader5.api import MetaTrader5Constants
+from datetime import datetime
 from .stats import TesterStats
 
 def html_report_template() -> str:
@@ -279,13 +280,13 @@ def render_order_rows(orders):
             <td>{datetime.fromtimestamp(o.time_setup)}</td>
             <td>{o.ticket}</td>
             <td>{o.symbol}</td>
-            <td>{ORDER_TYPE_MAP.get(o.type, o.type)}</td>
+            <td>{MetaTrader5Constants.ORDER_TYPE_MAP.get(o.type, o.type)}</td>
             <td class="text-end">{o.volume_initial:.2f} / {o.volume_current:.2f}</td>
             <td class="text-end">{o.price_open:.5f}</td>
             <td class="text-end">{"" if o.sl == 0 else f"{o.sl:.5f}"}</td>
             <td class="text-end">{"" if o.tp == 0 else f"{o.tp:.5f}"}</td>
             <td>{datetime.fromtimestamp(o.time_done) if o.time_done else ""}</td>
-            <td>{ORDER_STATE_MAP.get(o.state, o.state)}</td>
+            <td>{MetaTrader5Constants.ORDER_STATE_MAP.get(o.state, o.state)}</td>
             <td>{o.comment}</td>
         </tr>
         """)
@@ -302,8 +303,8 @@ def render_deal_rows(deals):
             <td>{datetime.fromtimestamp(d.time)}</td>
             <td>{d.ticket}</td>
             <td>{d.symbol}</td>
-            <td>{DEAL_TYPE_MAP[d.type]}</td>
-            <td>{DEAL_ENTRY_MAP[d.entry]}</td>
+            <td>{MetaTrader5Constants.DEAL_TYPE_MAP[d.type]}</td>
+            <td>{MetaTrader5Constants.DEAL_ENTRY_MAP[d.entry]}</td>
             <td class="text-end">{d.volume:.2f}</td>
             <td class="text-end">{d.price:.5f}</td>
             <td class="text-end">{d.commission:.2f}</td>
