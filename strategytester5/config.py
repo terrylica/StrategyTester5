@@ -22,12 +22,9 @@ REQUIRED_TESTER_CONFIG_KEYS = {
             "end_date",
             "modelling",
             "deposit",
-            "leverage",
-            "visual_mode"
+            "leverage"
         }
 
 SUPPORTED_TESTER_MODELLING_REVERSE = {
     v.lower(): k for k, v in SUPPORTED_TESTER_MODELLING.items()
 }
-
-EXPERTS_FOLDER = "StrategyTester5 PRO"
