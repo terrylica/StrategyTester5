@@ -27,7 +27,8 @@ class CTrade:
 
         Parameters
         ----------
-        terminal : MetaTrader5 module-like or the overloaded/simulated MetaTrader5 instance
+        terminal : Any
+            MetaTrader5 module-like or the overloaded/simulated MetaTrader5 instance
 
         magic_number : int
             Expert Advisor identifier used to tag and track orders and positions
