@@ -9,7 +9,6 @@ from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
 from strategytester5.config_validators import TesterConfigValidators
 from strategytester5.MetaTrader5.data import HistoryManager
 from strategytester5.MQL5.functions import PeriodSeconds
-from . import config
 from . import *
 from datetime import datetime
 import os
@@ -38,7 +37,6 @@ class StrategyTester:
                  logs_dir: Optional[str]="Logs",
                  reports_dir: Optional[str]="Reports",
                  history_dir: Optional[str]="History",
-                 broker_data_dir: Optional[str]=config.DEFAULT_BROKER_DATA_PATH,
                  trading_history_dir: Optional[str] = "TradingHistory",
                  polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto"):
         
@@ -51,7 +49,6 @@ class StrategyTester:
             logs_dir (str): Directory for log files.
             reports_dir (str): Directory for HTML reports and assets.
             history_dir (str): Directory for historical data storage.
-            broker_data_dir (str | optional): Directory containing account_info.json, symbol_info.json and similar files containing information about the broker
 `           trading_history_dir (str | optional) A directory to keep trading history.
 
              polars_collect_engine (str): Engine used by Polars when collecting historical data in functions for obtaining ticks — copy_ticks*, and bars information/rates (copy_rates*). Supported values are:
@@ -88,10 +85,7 @@ class StrategyTester:
         if self.live_mt5_instance is None:
             raise RuntimeError("Fatal, A live MetaTrader5 Instance isn't given. If you haven't installed it (WINDOWS-ONLY) run `pip install metatrader5`")
 
-        self.broker_data_dir = broker_data_dir
-        if broker_data_dir == config.DEFAULT_BROKER_DATA_PATH:
-            self.broker_data_dir = self.live_mt5_instance.account_info().server
-
+        self.broker_data_dir = self.live_mt5_instance.account_info().server
         self.simulated_mt5 = OverLoadedMetaTrader5API(logger=self.logger, 
                                                        broker_data_path=self.broker_data_dir,
                                                        polars_collect_engine=polars_collect_engine,
