@@ -5,7 +5,8 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)  # insert(0) so it wins over other paths
 
-from strategytester5.tester import StrategyTester, MetaTrader5 as mt5
+from strategytester5.tester import StrategyTester
+import MetaTrader5 as mt5
 from strategytester5.trade_classes.Trade import CTrade
 import json
 
@@ -22,14 +23,11 @@ except Exception as e:
 if not mt5.initialize():
     raise RuntimeError("Failed to initialize mt5.")
 
-tester = StrategyTester(tester_config=tester_configs["tester"],
-                        mt5_instance=mt5,
-                        logging_level=logging.DEBUG,
-                        broker_data_dir="ICMarketsSC-Demo")
+tester = StrategyTester(tester_config=tester_configs["tester"], mt5_instance=mt5, logging_level=logging.DEBUG)
 
 # ---------------------- inputs ----------------------------
 
-symbol = "EURUSD"
+symbol = "USDJPY"
 timeframe = "PERIOD_H1"
 magic_number = 10012026
 slippage = 100
@@ -38,12 +36,14 @@ tp = 500
 
 # ---------------------------------------------------------
 
-m_trade = CTrade(simulator=tester, magic_number=magic_number, filling_type_symbol=symbol, deviation_points=slippage)
-symbol_info = tester.symbol_info(symbol=symbol)
+logger = tester.logger
+
+m_trade = CTrade(terminal=tester.simulated_mt5, magic_number=magic_number, filling_type_symbol=symbol, deviation_points=slippage, logger=tester.logger)
+symbol_info = tester.simulated_mt5.symbol_info(symbol=symbol)
 
 def pos_exists(magic: int, type: int) -> bool:
 
-    positions_found = tester.positions_get()
+    positions_found = tester.simulated_mt5.positions_get()
     for position in positions_found:
         if position.type == type and position.magic == magic:
             return True
@@ -52,8 +52,10 @@ def pos_exists(magic: int, type: int) -> bool:
 
 def on_tick():
     
-    tick_info = tester.symbol_info_tick(symbol=symbol)
-    
+    tick_info = tester.simulated_mt5.symbol_info_tick(symbol=symbol)
+    if tick_info is None:
+        return
+
     ask = tick_info.ask
     bid = tick_info.bid
     
@@ -65,4 +67,4 @@ def on_tick():
     if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
         m_trade.sell(volume=0.01, symbol=symbol, price=bid, sl=bid + sl * pts, tp=bid - tp * pts, comment="Tester sell")  # we open a sell position
 
-tester.OnTick(ontick_func=on_tick) # very important!
+tester.run(on_tick_function=on_tick) # very important!

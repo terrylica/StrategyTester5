@@ -5,7 +5,8 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)  # insert(0) so it wins over other paths
 
-from strategytester5.tester import StrategyTester, MetaTrader5 as mt5
+import MetaTrader5 as mt5
+from strategytester5.tester import StrategyTester
 from strategytester5.trade_classes.Trade import CTrade
 import json
 from datetime import datetime
@@ -37,21 +38,21 @@ tp = 500
 
 # ---------------------------------------------------------
 
-m_trade = CTrade(simulator=tester, magic_number=magic_number, filling_type_symbol=symbol, deviation_points=slippage)
-symbol_info = tester.symbol_info(symbol=symbol)
+m_trade = CTrade(terminal=tester.simulated_mt5, magic_number=magic_number, filling_type_symbol=symbol, deviation_points=slippage, logger=tester.logger)
+symbol_info = tester.simulated_mt5.symbol_info(symbol=symbol)
 
-def pos_exists(magic: int, type: int) -> bool:
+def pos_exists(magic: int, pos_type: int) -> bool:
 
-    for position in tester.positions_get():
-        if position.type == type and position.magic == magic:
+    for position in tester.simulated_mt5.positions_get():
+        if position.type == pos_type and position.magic == magic:
             return True
     
     return False
 
-def martingale_lotsize(initial_lot: float, current_time: datetime, multiplier: float=2) -> float:
+def martingale_lot_size(initial_lot: float, current_time: datetime, multiplier: float=2) -> float:
 
     end_date = datetime.strptime(tester_configs["start_date"], "%d.%m.%Y %H:%M")
-    deals = tester.history_deals_get(date_from=end_date, date_to=current_time)
+    deals = tester.simulated_mt5.history_deals_get(date_from=end_date, date_to=current_time)
 
     if not deals:
         return initial_lot
@@ -67,7 +68,7 @@ def martingale_lotsize(initial_lot: float, current_time: datetime, multiplier: f
 
 def on_tick():
     
-    tick_info = tester.symbol_info_tick(symbol=symbol)
+    tick_info = tester.simulated_mt5.symbol_info_tick(symbol=symbol)
     
     ask = tick_info.ask
     bid = tick_info.bid
@@ -75,13 +76,13 @@ def on_tick():
 
     pts = symbol_info.point
 
-    lotsize = 0.01
-    final_lotsize = martingale_lotsize(initial_lot=lotsize, current_time=curr_time, multiplier=2)
+    lot_size = 0.01
+    final_lot_size = martingale_lot_size(initial_lot=lot_size, current_time=curr_time, multiplier=2)
 
-    if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_BUY):  # If a position of such kind doesn't exist
-        m_trade.buy(volume=final_lotsize, symbol=symbol, price=ask, sl=ask - sl * pts, tp=ask + tp * pts, comment="Tester buy")  # we open a buy position
+    if not pos_exists(magic=magic_number, pos_type=tester.simulated_mt5.POSITION_TYPE_BUY):  # If a position of such kind doesn't exist
+        m_trade.buy(volume=final_lot_size, symbol=symbol, price=ask, sl=ask - sl * pts, tp=ask + tp * pts, comment="Tester buy")  # we open a buy position
 
-    if not pos_exists(magic=magic_number, type=mt5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
-        m_trade.sell(volume=final_lotsize, symbol=symbol, price=bid, sl=bid + sl * pts, tp=bid - tp * pts, comment="Tester sell")  # we open a sell position
+    if not pos_exists(magic=magic_number, pos_type=tester.simulated_mt5.POSITION_TYPE_SELL):  # If a position of such kind doesn't exist
+        m_trade.sell(volume=final_lot_size, symbol=symbol, price=bid, sl=bid + sl * pts, tp=bid - tp * pts, comment="Tester sell")  # we open a sell position
 
-tester.OnTick(ontick_func=on_tick) # very important!
+tester.run(on_tick_function=on_tick) # very important!
