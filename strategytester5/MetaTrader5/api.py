@@ -7,6 +7,7 @@ from strategytester5.MetaTrader5.constants import MetaTrader5Constants as MetaTr
 import logging
 from datetime import datetime, timedelta
 from ..MQL5 import functions as mql5
+from .error_description import return_code_description
 from .trade_validators import TradeValidators
 from strategytester5 import config
 from . import data
@@ -160,7 +161,16 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def tick_update(self, symbol: str, tick: Union[Tick, dict, TICKS_DTYPE]):
 
         if isinstance(tick, dict):
-            tick = Tick(**tick)
+            tick = Tick(
+                time=tick["time"],
+                bid=tick["bid"],
+                ask=tick["ask"],
+                last=tick["last"],
+                volume=tick["volume"],
+                time_msc=tick["time_msc"],
+                flags=tick["flags"],
+                volume_real=tick["volume_real"],
+            )
 
         elif isinstance(tick, np.void):
             tick = Tick(
@@ -875,9 +885,11 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
             tp = float(request.get("tp", 0))
 
         except KeyError:
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_INVALID)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_INVALID)
 
         if order_type not in (self.ORDER_TYPE_BUY, self.ORDER_TYPE_SELL):
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_INVALID)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_INVALID)
 
         # ------------------------ All checks and return codes ----------------------
@@ -890,23 +902,28 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         ac_info = self.account_info()
 
         if tick is None:
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_PRICE_OFF)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_PRICE_OFF)  # NO_QUOTES
 
         eps = pow(10, -symbol_info.digits)
 
         if type == self.ORDER_TYPE_BUY:
             if not TradeValidators.price_equal(price, tick.ask, eps):
+                self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_PRICE_CHANGED)}")
                 return self._make_result(trade_request, self.TRADE_RETCODE_PRICE_CHANGED)  # PRICE_CHANGED
 
         elif type == self.ORDER_TYPE_SELL:
             if not TradeValidators.price_equal(price, tick.bid, eps):
+                self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_PRICE_CHANGED)}")
                 return self._make_result(trade_request, self.TRADE_RETCODE_PRICE_CHANGED)
 
         # sl and tp checks
         if not validators.is_valid_sl(price, sl, order_type):
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_INVALID_STOPS)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_INVALID_STOPS)
 
         if not validators.is_valid_tp(price, tp, order_type):
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_INVALID_STOPS)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_INVALID_STOPS)
 
         # check if there is enough money
@@ -923,31 +940,37 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         future_margin = ac_info.margin + margin
         future_equity = ac_info.equity
 
+
         if future_margin > 0:
             future_margin_level = (future_equity / future_margin) * 100
         else:
             future_margin_level = float("inf")
 
         if future_margin_level <= ac_info.margin_so_call:
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_NO_MONEY)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_NO_MONEY)
 
         if margin > ac_info.margin_free:
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_NO_MONEY)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_NO_MONEY)  # NO_MONEY
 
         # ---------------- MAX ORDERS CHECK ---------------------
 
         if validators.is_max_orders_reached(open_orders=self.orders_total(), ac_limit_orders=self.ACCOUNT.limit_orders):
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_LIMIT_ORDERS)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_LIMIT_ORDERS)
 
         # ---------------- VOLUME VALIDATION ----------------
 
         if not validators.is_valid_lotsize(volume):
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_INVALID_VOLUME)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_INVALID_VOLUME)
 
         total_volume = sum([pos.volume for pos in self.POSITIONS]) + sum(
             [order.volume_current for order in self.ORDERS])
 
         if validators.is_symbol_volume_reached(symbol_volume=total_volume, volume_limit=symbol_info.volume_limit):
+            self.logger.debug(f"{return_code_description(self.TRADE_RETCODE_LIMIT_VOLUME)}")
             return self._make_result(trade_request, self.TRADE_RETCODE_LIMIT_VOLUME)
 
         # ------------------------ FILL THE REQUEST ----------------------------------
@@ -967,9 +990,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         self.ORDERS_HISTORY.append(
             self._position_to_order(position=position, ticket=self._generate_order_history_ticket())
         )
-
-        # if this position comes from a pending order
-        order_ticket = int(request.get("order", -1))
 
         self.logger.info(f"Position {deal.ticket} opened successfully!")
         return self._make_result(trade_request, retcode=self.TRADE_RETCODE_DONE, deal=deal.ticket, order=deal.order, volume=position.volume)
@@ -1596,6 +1616,10 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         """
 
+        if order_type not in (self.ORDER_TYPE_BUY, self.ORDER_TYPE_SELL):
+            self.logger.critical(f"Invalid order type: {order_type}")
+            return 0.0
+
         if volume <= 0 or price <= 0:
             self.logger.error("order_calc_margin failed: invalid volume or price")
             return 0.0
@@ -1618,7 +1642,35 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         mode = sym.trade_calc_mode
 
         if mode == self.SYMBOL_CALC_MODE_FOREX:
-            margin = (volume * contract_size * price) / leverage
+
+            base = sym.currency_base
+            quote = sym.currency_profit
+            account_currency = self.account_info().currency
+
+            # margin = (volume * contract_size * price) / leverage
+
+            if account_currency == base:
+                # USDJPY, account USD
+                margin = (volume * contract_size) / leverage
+
+            elif account_currency == quote:
+                # EURUSD, account USD
+                margin = (volume * contract_size * price) / leverage
+
+            else:
+                # Cross currency (e.g. EURGBP, account USD)
+                # convert margin to account currency
+                margin = (volume * contract_size * price) / leverage
+
+                """
+                conversion_symbol = f"{quote}{account_currency}"
+                conversion_tick = self.symbol_info_tick(conversion_symbol)
+
+                if conversion_tick:
+                    margin *= conversion_tick.bid
+                else:
+                    self.logger.warning("Conversion symbol not found")
+                """
 
         elif mode == self.SYMBOL_CALC_MODE_FOREX_NO_LEVERAGE:
             margin = volume * contract_size * price
