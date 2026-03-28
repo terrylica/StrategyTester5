@@ -97,6 +97,11 @@ class StrategyTester:
                                                        polars_collect_engine=polars_collect_engine,
                                                        live_mt5=self.live_mt5_instance)
 
+        start_dt = self.tester_config.get("start_date", 0)
+        start_dt_ts = start_dt.timestamp() if isinstance(start_dt, datetime) else start_dt
+
+        self.simulated_mt5._current_time = start_dt_ts
+        self.simulated_mt5._current_time_msc = start_dt_ts * 1000
         self.logger.info("Initialized")
         deposit = self.tester_config["deposit"]
 
