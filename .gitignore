@@ -4,12 +4,20 @@
 .idea/
 
 __pycache__/
-Logs/
 
 test.html
 release.md
 
-Reports/
 
 strategytester5.egg-info/
 dist/
+
+# from examples
+
+Reports/
+History/
+ICMarketsSC-Demo
+Logs/
+TradingHistory/
+
+*.html
