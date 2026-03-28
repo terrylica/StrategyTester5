@@ -150,7 +150,7 @@ class HistoryManager:
 
         # with self._mt5_lock:
         rates = self.mt5_instance.copy_rates_range(symbol, timeframe, start, end)
-        if rates is None:
+        if rates is None or len(rates)==0:
             warn = f"No bars were received from MetaTrader5 from {symbol} for: {year:04d}-{month:02d}"
             self._warning_log(warn)
             return None
@@ -203,7 +203,7 @@ class HistoryManager:
 
         # with self._mt5_lock:
         ticks = self.mt5_instance.copy_ticks_range(symbol, start, end, self.mt5_instance.COPY_TICKS_ALL)
-        if ticks is None:
+        if ticks is None or len(ticks)==0:
             warn = f"No ticks were received from MetaTrader5 from {symbol} for: {year:04d}-{month:02d}"
             self._warning_log(warn)
             return None
@@ -224,8 +224,6 @@ class HistoryManager:
             date_to: datetime,
             max_workers: int = 4,
     ):
-        
-        
 
         if date_from > date_to:
             self._warning_log("date_from must be <= date_to")
@@ -273,9 +271,6 @@ class HistoryManager:
             broker_data_dir: Optional[str] = config.DEFAULT_BROKER_DATA_PATH,
             logger: Optional[logging.Logger] = None
     ):
-        
-        
-
         if date_from > date_to:
             _warning_log("date_from must be <= date_to", logger)
             return None
