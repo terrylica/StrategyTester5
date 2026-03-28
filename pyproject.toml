@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "strategytester5"
-version = "1.7.0"
+version = "2.0.1"
 description = "A Python-based MetaTrader strategy tester for the MetaTrader5 module"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -24,7 +24,8 @@ dependencies = [
   "scipy",
   "plotly",
   "kaleido",
-  "nbformat"
+  "nbformat",
+  "metatrader5"
 ]
 
 keywords = [
@@ -38,7 +39,6 @@ keywords = [
   "backtesting",
   "algorithmic trading"
 ]
-
 
 classifiers = [
   "Intended Audience :: Developers",
@@ -59,7 +59,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-mt5 = ["metatrader5"]
+#mt5 = ["metatrader5"]
 
 [project.urls]
 Homepage = "https://github.com/MegaJoctan/StrategyTester5"
