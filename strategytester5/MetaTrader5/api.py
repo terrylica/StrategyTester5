@@ -223,15 +223,20 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
                 Returns bars as the numpy array with the named time, open, high, low, close, tick_volume, spread and real_volume columns. Returns None in case of an error. The info on the error can be obtained using MetaTrader5.last_error().
         """
 
-        if not isinstance(date_from, datetime) or isinstance(date_to, datetime):
+        if not isinstance(date_from, datetime) or not isinstance(date_to, datetime):
             self.logger.warning("Failed, both `date_from` and `date_to` must be datetime objects")
             return None
 
-        return self.history_manager.copy_rates_range_from_parquet(symbol, timeframe, date_from, date_to,
-                                                               polars_collect_engine=self.polars_collect_engine,
-                                                               broker_data_dir=self.broker_data_path,
-                                                               logger=self.logger)
+        rates = self.history_manager.copy_rates_range_from_parquet(symbol, timeframe, date_from, date_to,
+                                                                   polars_collect_engine=self.polars_collect_engine,
+                                                                   broker_data_dir=self.broker_data_path,
+                                                                   logger=self.logger)
 
+        if rates is None or len(rates) == 0:
+            self.logger.warning(f"no rates found on {symbol} from {date_from} bars: {date_to}")
+            return None
+
+        return rates
 
     def copy_rates_from(self, symbol: str, timeframe: int, date_from: datetime, count: int) -> Optional[RATES_DTYPE]:
 
