@@ -8,10 +8,28 @@ class TradeValidators:
                  symbol_info: SymbolInfo,
                  logger: logging.Logger):
 
+        """
+        This is the equivalent of MetaTrader5's trade validation system. The methods of this class are used by the simulator before opening or modifying any trade to ensure that the trade would be accepted by the MetaTrader 5 terminal if it were executed in real time.
+
+        Args:
+            symbol_info (SymbolInfo): The symbol information object containing the trading parameters for the symbol being traded
+            logger (logging.Logger): The logger to use for logging validation warnings and errors
+        """
+
         self.symbol_info = symbol_info
         self.logger = logger
 
     def is_valid_lotsize(self, lotsize: float) -> bool:
+
+        """
+        Checks if a given lotsize is a valid one i.e,. not below the minimum value, not above the maximum accepted lotsize, and a multiple of the volume step value.
+
+        Args:
+            lotsize: Lotsize for the new trade
+
+        Returns:
+            bool: True if a lotsize is valid, False otherwise
+        """
 
         # Validate lotsize
 
@@ -36,7 +54,14 @@ class TradeValidators:
 
     def is_valid_freeze_level(self, tick_info: Tick, entry: float, stop_price: float, order_type: int) -> bool:
         """
-        Check SYMBOL_TRADE_FREEZE_LEVEL for pending orders and open positions.
+        Checks if the entry price or stop loss / take profit price is too close to the current market price based on the symbol's freeze level.
+
+        Args:
+            tick_info (Tick): The current tick information for the symbol
+            entry (float): The entry price of the order
+            stop_price (float): The stop loss or take profit price to validate
+            order_type (int): The MetaTrader 5 order type (e.g., BUY, SELL, BUY_LIMIT, etc.)
+
         """
 
         freeze_level = self.symbol_info.trade_freeze_level
@@ -159,6 +184,17 @@ class TradeValidators:
 
     def is_valid_stops_level(self, entry: float, stop_price: float, stops_type: str = '') -> bool:
 
+        """Checks if either stop loss or take profit is above the minimum allowed distance from the entry price (freeze level + stop level). If stops_type is provided, it will be used in the warning message, otherwise, the message will refer to "Either SL or TP".
+
+        Args:
+            entry (float): The entry price of the order
+            stop_price (float): The stop loss or take profit price to validate
+            stops_type (str, optional): The type of stop to validate ("Stoploss" or "Takeprofit"). Defaults to ''.
+
+        Returns:
+            bool: True for valid stop level and False for invalid stop level
+        """
+
         point = self.symbol_info.point
         stop_level = self.symbol_info.trade_stops_level * point
 
@@ -175,6 +211,17 @@ class TradeValidators:
         return True
 
     def is_valid_sl(self, entry: float, sl: float, order_type: int) -> bool:
+
+        """Checks if a given stop loss price is valid for a given entry price and order type. It checks if the stop loss is at a valid distance from the entry price and if it is in the correct direction (below the entry for buy orders and above the entry for sell orders).
+
+        Args:
+            entry (float): The entry price of the order
+            sl (float): The stop loss price to validate
+            order_type (int): The MetaTrader 5 order type (e.g., BUY, SELL, BUY_LIMIT, etc.)
+
+        Returns:
+            bool: True for valid stop loss and False for invalid stop loss
+        """
 
         if not self.is_valid_stops_level(entry, sl, "Stoploss"):  # check for stops and freeze levels
             return False
@@ -206,6 +253,17 @@ class TradeValidators:
 
     def is_valid_tp(self, entry: float, tp: float, order_type: int) -> bool:
 
+        """Checks if a given take profit price is valid for a given entry price and order type. It checks if the take profit is at a valid distance from the entry price and if it is in the correct direction (above the entry for buy orders and below the entry for sell orders).
+
+        Args:
+            entry (float): The entry price of the order
+            tp (float): The take profit price to validate
+            order_type (int): The MetaTrader 5 order type (e.g., BUY, SELL, BUY_LIMIT, etc.)
+
+        Returns:
+            bool: True for valid take profit and False for invalid take profit
+        """
+
         if not self.is_valid_stops_level(entry, tp, "Takeprofit"):  # check for stops and freeze levels
             return False
 
@@ -231,6 +289,18 @@ class TradeValidators:
         return abs(a - b) <= eps
 
     def is_valid_entry_price(self, tick_info: Tick, price: float, order_type: int) -> bool:
+        """
+        Checks if the entry price is valid for a given tick and position type. It checks if the entry price is equal to the current ask (for buy orders) or bid (for sell orders) within a small epsilon.
+
+        Args:
+            tick_info (Tick): The current tick information for the symbol
+            price (float): The entry price to validate
+            order_type (int): The MetaTrader 5 order type (e.g., BUY, SELL)
+
+        Returns:
+            bool: True for valid entry price and False for invalid entry price
+
+        """
 
         eps = pow(10, -self.symbol_info.digits)
         if order_type == MetaTrader5Constants.ORDER_TYPE_BUY:  # BUY
@@ -250,6 +320,17 @@ class TradeValidators:
 
     @staticmethod
     def is_valid_pending_price(price, tick, order_type):
+
+        """
+        Checks if the pending order price is valid for a given tick and position type. It checks if the pending order price is below the current ask (for buy limit orders) or above the current bid (for sell limit orders) or above the current ask (for buy stop orders) or below the current bid (for sell stop orders).
+
+        Args:
+            price (float): The pending order price to validate
+            tick (Tick): The current tick information for the symbol
+            order_type (int): The MetaTrader 5 pending order type (e.g., BUY_LIMIT, SELL_LIMIT, etc.)
+
+        """
+
         if order_type == MetaTrader5Constants.ORDER_TYPE_BUY_LIMIT:
             return price < tick.ask
         elif order_type == MetaTrader5Constants.ORDER_TYPE_SELL_LIMIT:
@@ -262,6 +343,17 @@ class TradeValidators:
 
     def is_there_enough_money(self, margin_required: float, free_margin: float) -> bool:
 
+        """
+        Checks if there is enough free margin to open a trade with the required margin. It also checks if the margin required is a valid non-negative number.
+
+        Args:
+            margin_required (float): The margin required to open the trade
+            free_margin (float): The current free margin of the account
+
+        Returns:
+            bool: True if there is enough free margin to open the trade and False otherwise
+        """
+
         if margin_required < 0:
             self.logger.warning("Trade validation failed: Cannot calculate margin requirements")
             return False
@@ -269,8 +361,8 @@ class TradeValidators:
         # Check free margin
         if margin_required > free_margin:
             self.logger.warning(f'Trade validation failed: Not enough money to open trade. '
-                             f'Required: {margin_required:.2f}, '
-                             f'Free margin: {free_margin:.2f}')
+                                f'Required: {margin_required:.2f}, '
+                                f'Free margin: {free_margin:.2f}')
 
             return False
 

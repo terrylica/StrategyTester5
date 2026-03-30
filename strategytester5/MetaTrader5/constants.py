@@ -1,29 +1,52 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class MetaTrader5Constants:
+    """MetaTrader 5 constants, such as timeframes, order types, deal types, etc."""
     # timeframes
     TIMEFRAME_M1 = 1
+    """One-minute timeframe."""
     TIMEFRAME_M2 = 2
+    """Two-minute timeframe."""
     TIMEFRAME_M3 = 3
+    """Three-minute timeframe."""
     TIMEFRAME_M4 = 4
+    """Four-minute timeframe."""
     TIMEFRAME_M5 = 5
+    """Five-minute timeframe."""
     TIMEFRAME_M6 = 6
+    """Six-minute timeframe."""
     TIMEFRAME_M10 = 10
+    """Ten-minute timeframe."""
     TIMEFRAME_M12 = 12
+    """Twelve-minute timeframe."""
     TIMEFRAME_M15 = 15
+    """Fifteen-minute timeframe."""
     TIMEFRAME_M20 = 20
+    """Twenty-minute timeframe."""
     TIMEFRAME_M30 = 30
+    """Thirty-minute timeframe."""
     TIMEFRAME_H1 = 1 | 0x4000
+    """One-hour timeframe."""
     TIMEFRAME_H2 = 2 | 0x4000
+    """Two-hour timeframe."""
     TIMEFRAME_H4 = 4 | 0x4000
+    """Four-hour timeframe."""
     TIMEFRAME_H3 = 3 | 0x4000
+    """Three-hour timeframe."""
     TIMEFRAME_H6 = 6 | 0x4000
+    """Six-hour timeframe."""
     TIMEFRAME_H8 = 8 | 0x4000
+    """Eight-hour timeframe."""
     TIMEFRAME_H12 = 12 | 0x4000
+    """Twelve-hour timeframe."""
     TIMEFRAME_D1 = 24 | 0x4000
+    """One-day timeframe."""
     TIMEFRAME_W1 = 1 | 0x8000
+    """One-week timeframe."""
     TIMEFRAME_MN1 = 1 | 0xC000
+    """One-Month timeframe."""
     # tick copy flags
     COPY_TICKS_ALL = -1
     COPY_TICKS_INFO = 1
@@ -35,95 +58,180 @@ class MetaTrader5Constants:
     TICK_FLAG_VOLUME = 0x10
     TICK_FLAG_BUY = 0x20
     TICK_FLAG_SELL = 0x40
+
     # position type, ENUM_POSITION_TYPE
-    POSITION_TYPE_BUY = 0  # Buy
-    POSITION_TYPE_SELL = 1  # Sell
+    POSITION_TYPE_BUY = 0
+    """Buy"""
+    POSITION_TYPE_SELL = 1
+    """Sell"""
     # position reason, ENUM_POSITION_REASON
-    POSITION_REASON_CLIENT = 0  # The position was opened as a result of activation of an order placed from a desktop terminal
-    POSITION_REASON_MOBILE = 1  # The position was opened as a result of activation of an order placed from a mobile application
-    POSITION_REASON_WEB = 2  # The position was opened as a result of activation of an order placed from the web platform
-    POSITION_REASON_EXPERT = 3  # The position was opened as a result of activation of an order placed from an MQL5 program, i.e. an Expert Advisor or a script
+    POSITION_REASON_CLIENT = 0
+    """The position was opened as a result of activation of an order placed from a desktop terminal"""
+    POSITION_REASON_MOBILE = 1
+    """The position was opened as a result of activation of an order placed from a mobile application"""
+    POSITION_REASON_WEB = 2
+    """The position was opened as a result of activation of an order placed from the web platform"""
+    POSITION_REASON_EXPERT = 3
+    """The position was opened as a result of activation of an order placed from an MQL5 program, i.e. an Expert Advisor or a script"""
+
     # order types, ENUM_ORDER_TYPE
-    ORDER_TYPE_BUY = 0  # Market Buy order
-    ORDER_TYPE_SELL = 1  # Market Sell order
-    ORDER_TYPE_BUY_LIMIT = 2  # Buy Limit pending order
-    ORDER_TYPE_SELL_LIMIT = 3  # Sell Limit pending order
-    ORDER_TYPE_BUY_STOP = 4  # Buy Stop pending order
-    ORDER_TYPE_SELL_STOP = 5  # Sell Stop pending order
-    ORDER_TYPE_BUY_STOP_LIMIT = 6  # Upon reaching the order price, a pending Buy Limit order is placed at the StopLimit price
-    ORDER_TYPE_SELL_STOP_LIMIT = 7  # Upon reaching the order price, a pending Sell Limit order is placed at the StopLimit price
-    ORDER_TYPE_CLOSE_BY = 8  # Order to close a position by an opposite one
+
+    ORDER_TYPE_BUY = 0
+    """Market Buy order"""
+    ORDER_TYPE_SELL = 1
+    """Market Sell order"""
+    ORDER_TYPE_BUY_LIMIT = 2
+    """Buy Limit pending order"""
+    ORDER_TYPE_SELL_LIMIT = 3
+    """Sell Limit pending order"""
+    ORDER_TYPE_BUY_STOP = 4
+    """Buy Stop pending order"""
+    ORDER_TYPE_SELL_STOP = 5
+    """Sell Stop pending order"""
+    ORDER_TYPE_BUY_STOP_LIMIT = 6
+    """Upon reaching the order price, a pending Buy Limit order is placed at the StopLimit price"""
+    ORDER_TYPE_SELL_STOP_LIMIT = 7
+    """Upon reaching the order price, a pending Sell Limit order is placed at the StopLimit price"""
+    ORDER_TYPE_CLOSE_BY = 8
+    """Order to close a position by an opposite one"""
     # order state, ENUM_ORDER_STATE
-    ORDER_STATE_STARTED = 0  # Order checked, but not yet accepted by broker
-    ORDER_STATE_PLACED = 1  # Order accepted
-    ORDER_STATE_CANCELED = 2  # Order canceled by client
-    ORDER_STATE_PARTIAL = 3  # Order partially executed
-    ORDER_STATE_FILLED = 4  # Order fully executed
-    ORDER_STATE_REJECTED = 5  # Order rejected
-    ORDER_STATE_EXPIRED = 6  # Order expired
-    ORDER_STATE_REQUEST_ADD = 7  # Order is being registered (placing to the trading system)
-    ORDER_STATE_REQUEST_MODIFY = 8  # Order is being modified (changing its parameters)
-    ORDER_STATE_REQUEST_CANCEL = 9  # Order is being deleted (deleting from the trading system)
+    ORDER_STATE_STARTED = 0
+    """Order checked, but not yet accepted by broker"""
+    ORDER_STATE_PLACED = 1
+    """Order accepted"""
+    ORDER_STATE_CANCELED = 2
+    """Order canceled by client"""
+    ORDER_STATE_PARTIAL = 3
+    """Order partially executed"""
+    ORDER_STATE_FILLED = 4
+    """Order fully executed"""
+    ORDER_STATE_REJECTED = 5
+    """Order rejected"""
+    ORDER_STATE_EXPIRED = 6
+    """Order expired"""
+    ORDER_STATE_REQUEST_ADD = 7
+    """Order is being registered (placing to the trading system)"""
+    ORDER_STATE_REQUEST_MODIFY = 8
+    """Order is being modified (changing its parameters)"""
+    ORDER_STATE_REQUEST_CANCEL = 9
+    """Order is being deleted (deleting from the trading system)"""
+
     # ENUM_ORDER_TYPE_FILLING
-    ORDER_FILLING_FOK = 0  # Fill Or Kill order
-    ORDER_FILLING_IOC = 1  # Immediately Or Cancel
-    ORDER_FILLING_RETURN = 2  # Return remaining volume to book
-    ORDER_FILLING_BOC = 3  # Book Or Cancel order
+
+    ORDER_FILLING_FOK = 0
+    """Fill Or Kill order"""
+    ORDER_FILLING_IOC = 1
+    """Immediately Or Cancel"""
+    ORDER_FILLING_RETURN = 2
+    """Return remaining volume to book"""
+    ORDER_FILLING_BOC = 3
+    """Book Or Cancel order"""
+
     # ENUM_ORDER_TYPE_TIME
-    ORDER_TIME_GTC = 0  # Good till cancel order
-    ORDER_TIME_DAY = 1  # Good till current trade day order
-    ORDER_TIME_SPECIFIED = 2  # Good till expired order
-    ORDER_TIME_SPECIFIED_DAY = 3  # The order will be effective till 23:59:59 of the specified day. If this time is outside a trading session, the order expires in the nearest trading time.
+
+    ORDER_TIME_GTC: int = 0  # Good till cancel order
+    """ORDER_TIME_GTC - Good till cancel order"""
+    ORDER_TIME_DAY = 1
+    """ Good till current trade day order"""
+    ORDER_TIME_SPECIFIED = 2
+    """ Good till expired order"""
+    ORDER_TIME_SPECIFIED_DAY = 3
+    """ The order will be effective till 23:59:59 of the specified day. If this time is outside a trading session, the order expires in the nearest trading time."""
     # ENUM_ORDER_REASON
-    ORDER_REASON_CLIENT = 0  # The order was placed from a desktop terminal
-    ORDER_REASON_MOBILE = 1  # The order was placed from a mobile application
-    ORDER_REASON_WEB = 2  # The order was placed from a web platform
-    ORDER_REASON_EXPERT = 3  # The order was placed from an MQL5-program, i.e. by an Expert Advisor or a script
-    ORDER_REASON_SL = 4  # The order was placed as a result of Stop Loss activation
-    ORDER_REASON_TP = 5  # The order was placed as a result of Take Profit activation
-    ORDER_REASON_SO = 6  # The order was placed as a result of the Stop Out event
+    ORDER_REASON_CLIENT = 0
+    """The order was placed from a desktop terminal"""
+    ORDER_REASON_MOBILE = 1
+    """The order was placed from a mobile application"""
+    ORDER_REASON_WEB = 2
+    """The order was placed from a web platform"""
+    ORDER_REASON_EXPERT = 3
+    """The order was placed from an MQL5-program, i.e. by an Expert Advisor or a script"""
+    ORDER_REASON_SL = 4
+    """The order was placed as a result of Stop Loss activation"""
+    ORDER_REASON_TP = 5
+    """The order was placed as a result of Take Profit activation"""
+    ORDER_REASON_SO = 6
+    """The order was placed as a result of the Stop Out event"""
     # deal types, ENUM_DEAL_TYPE
-    DEAL_TYPE_BUY = 0  # Buy
-    DEAL_TYPE_SELL = 1  # Sell
-    DEAL_TYPE_BALANCE = 2  # Balance
-    DEAL_TYPE_CREDIT = 3  # Credit
-    DEAL_TYPE_CHARGE = 4  # Additional charge
-    DEAL_TYPE_CORRECTION = 5  # Correction
-    DEAL_TYPE_BONUS = 6  # Bonus
-    DEAL_TYPE_COMMISSION = 7  # Additional commission
-    DEAL_TYPE_COMMISSION_DAILY = 8  # Daily commission
-    DEAL_TYPE_COMMISSION_MONTHLY = 9  # Monthly commission
-    DEAL_TYPE_COMMISSION_AGENT_DAILY = 10  # Daily agent commission
-    DEAL_TYPE_COMMISSION_AGENT_MONTHLY = 11  # Monthly agent commission
-    DEAL_TYPE_INTEREST = 12  # Interest rate
-    DEAL_TYPE_BUY_CANCELED = 13  # Canceled buy deal.
-    DEAL_TYPE_SELL_CANCELED = 14  # Canceled sell deal.
-    DEAL_DIVIDEND = 15  # Dividend operations
-    DEAL_DIVIDEND_FRANKED = 16  # Franked (non-taxable) dividend operations
-    DEAL_TAX = 17  # Tax charges
+    DEAL_TYPE_BUY = 0
+    """Buy"""
+    DEAL_TYPE_SELL = 1
+    """Sell"""
+    DEAL_TYPE_BALANCE = 2
+    """Balance"""
+    DEAL_TYPE_CREDIT = 3
+    """Credit"""
+    DEAL_TYPE_CHARGE = 4
+    """Additional charge"""
+    DEAL_TYPE_CORRECTION = 5
+    """Correction"""
+    DEAL_TYPE_BONUS = 6
+    """Bonus"""
+    DEAL_TYPE_COMMISSION = 7
+    """Additional commission"""
+    DEAL_TYPE_COMMISSION_DAILY = 8
+    """Daily commission"""
+    DEAL_TYPE_COMMISSION_MONTHLY = 9
+    """Monthly commission"""
+    DEAL_TYPE_COMMISSION_AGENT_DAILY = 10
+    """Daily agent commission"""
+    DEAL_TYPE_COMMISSION_AGENT_MONTHLY = 11
+    """Monthly agent commission"""
+    DEAL_TYPE_INTEREST = 12
+    """Interest rate"""
+    DEAL_TYPE_BUY_CANCELED = 13
+    """Canceled buy deal."""
+    DEAL_TYPE_SELL_CANCELED = 14
+    """Canceled sell deal."""
+    DEAL_DIVIDEND = 15
+    """Dividend operations"""
+    DEAL_DIVIDEND_FRANKED = 16
+    """Franked (non-taxable) dividend operations"""
+    DEAL_TAX = 17
+    """Tax charges"""
     # ENUM_DEAL_ENTRY
-    DEAL_ENTRY_IN = 0  # Entry in
-    DEAL_ENTRY_OUT = 1  # Entry out
-    DEAL_ENTRY_INOUT = 2  # Reverse
-    DEAL_ENTRY_OUT_BY = 3  # Close a position by an opposite one
+    DEAL_ENTRY_IN = 0
+    """Entry in"""
+    DEAL_ENTRY_OUT = 1
+    """Entry out"""
+    DEAL_ENTRY_INOUT = 2
+    """Reverse"""
+    DEAL_ENTRY_OUT_BY = 3
+    """Close a position by an opposite one"""
     # ENUM_DEAL_REASON
-    DEAL_REASON_CLIENT = 0  # The deal was executed as a result of activation of an order placed from a desktop terminal
-    DEAL_REASON_MOBILE = 1  # The deal was executed as a result of activation of an order placed from a mobile application
-    DEAL_REASON_WEB = 2  # The deal was executed as a result of activation of an order placed from the web platform
-    DEAL_REASON_EXPERT = 3  # The deal was executed as a result of activation of an order placed from an MQL5 program, i.e. an Expert Advisor or a script
-    DEAL_REASON_SL = 4  # The deal was executed as a result of Stop Loss activation
-    DEAL_REASON_TP = 5  # The deal was executed as a result of Take Profit activation
-    DEAL_REASON_SO = 6  # The deal was executed as a result of the Stop Out event
-    DEAL_REASON_ROLLOVER = 7  # The deal was executed due to a rollover
-    DEAL_REASON_VMARGIN = 8  # The deal was executed after charging the variation margin
-    DEAL_REASON_SPLIT = 9  # The deal was executed after the split (price reduction) of an instrument, which had an open position during split announcement
+    DEAL_REASON_CLIENT = 0
+    """The deal was executed as a result of activation of an order placed from a desktop terminal"""
+    DEAL_REASON_MOBILE = 1
+    """The deal was executed as a result of activation of an order placed from a mobile application"""
+    DEAL_REASON_WEB = 2
+    """The deal was executed as a result of activation of an order placed from the web platform"""
+    DEAL_REASON_EXPERT = 3
+    """The deal was executed as a result of activation of an order placed from an MQL5 program, i.e. an Expert Advisor or a script"""
+    DEAL_REASON_SL = 4
+    """The deal was executed as a result of Stop Loss activation"""
+    DEAL_REASON_TP = 5
+    """The deal was executed as a result of Take Profit activation"""
+    DEAL_REASON_SO = 6
+    """The deal was executed as a result of the Stop Out event"""
+    DEAL_REASON_ROLLOVER = 7
+    """The deal was executed due to a rollover"""
+    DEAL_REASON_VMARGIN = 8
+    """The deal was executed after charging the variation margin"""
+    DEAL_REASON_SPLIT = 9
+    """The deal was executed after the split (price reduction) of an instrument, which had an open position during split announcement"""
     # ENUM_TRADE_REQUEST_ACTIONS, Trade Operation Types
-    TRADE_ACTION_DEAL = 1  # Place a trade order for an immediate execution with the specified parameters (market order)
-    TRADE_ACTION_PENDING = 5  # Place a trade order for the execution under specified conditions (pending order)
-    TRADE_ACTION_SLTP = 6  # Modify Stop Loss and Take Profit values of an opened position
-    TRADE_ACTION_MODIFY = 7  # Modify the parameters of the order placed previously
-    TRADE_ACTION_REMOVE = 8  # Delete the pending order placed previously
-    TRADE_ACTION_CLOSE_BY = 10  # Close a position by an opposite one
+    TRADE_ACTION_DEAL = 1
+    """Place a trade order for an immediate execution with the specified parameters (market order)"""
+    TRADE_ACTION_PENDING = 5
+    """Place a trade order for the execution under specified conditions (pending order)"""
+    TRADE_ACTION_SLTP = 6
+    """Modify Stop Loss and Take Profit values of an opened position"""
+    TRADE_ACTION_MODIFY = 7
+    """Modify the parameters of the order placed previously"""
+    TRADE_ACTION_REMOVE = 8
+    """Delete the pending order placed previously"""
+    TRADE_ACTION_CLOSE_BY = 10
+    """Close a position by an opposite one"""
     # ENUM_SYMBOL_CHART_MODE
     SYMBOL_CHART_MODE_BID = 0
     SYMBOL_CHART_MODE_LAST = 1
@@ -350,7 +458,6 @@ class MetaTrader5Constants:
         ORDER_TYPE_SELL_STOP,
         # ORDER_TYPE_SELL_STOP_LIMIT,
     }
-
 
     STRING2TIMEFRAME_MAP = {
         "M1": TIMEFRAME_M1,

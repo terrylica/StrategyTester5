@@ -5,17 +5,18 @@ from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
 from . import config
 from datetime import datetime
 
+
 class TesterConfigValidators:
     """
-    Responsible for validating and normalizing strategy tester configurations.
+        A module responsible for validating and normalizing strategy tester configurations.
     """
 
     def __init__(self):
         pass
-    
+
     @staticmethod
     def _validate_keys(raw_config: Dict) -> None:
-        
+
         required_keys = config.REQUIRED_TESTER_CONFIG_KEYS
         provided_keys = set(raw_config.keys())
 
@@ -26,7 +27,7 @@ class TesterConfigValidators:
         extra = provided_keys - required_keys
         if extra:
             raise RuntimeError(f"Unknown tester config keys: {extra}")
-        
+
     @staticmethod
     def _parse_leverage(leverage: str) -> int:
         """
@@ -64,6 +65,9 @@ class TesterConfigValidators:
 
     @staticmethod
     def parse_tester_configs(raw_config: Dict) -> Dict:
+
+        """ Validates and normalizes raw tester configuration dictionary. """
+
         TesterConfigValidators._validate_keys(raw_config)
 
         cfg: Dict = {}
@@ -80,11 +84,12 @@ class TesterConfigValidators:
         # --- TIMEFRAME ---
         timeframe = raw_config["timeframe"]
         if timeframe not in OverLoadedMetaTrader5API.STRING2TIMEFRAME_MAP:
-            raise RuntimeError(f"Invalid timeframe: {timeframe} supported: {OverLoadedMetaTrader5API.STRING2TIMEFRAME_MAP.keys()}")
+            raise RuntimeError(
+                f"Invalid timeframe: {timeframe} supported: {OverLoadedMetaTrader5API.STRING2TIMEFRAME_MAP.keys()}")
         cfg["timeframe"] = timeframe
 
         # --- MODELLING ---
-        
+
         cfg["modelling"] = TesterConfigValidators._parse_modelling(raw_config["modelling"])
 
         # --- DATE PARSING ---

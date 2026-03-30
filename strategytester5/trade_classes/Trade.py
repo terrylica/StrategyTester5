@@ -23,26 +23,26 @@ class CTrade:
         a convenient Python interface for sending and managing trade requests through
         the MetaTrader 5 Python API.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/ctrade
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/ctrade)
 
-        Parameters
-        ----------
-        terminal : Any
+        Args:
+
+        terminal (Any):
             MetaTrader5 module-like or the overloaded/simulated MetaTrader5 instance
 
-        magic_number : int
+        magic_number (int):
             Expert Advisor identifier used to tag and track orders and positions
             created by this trade object.
 
-        filling_type_symbol : str
+        filling_type_symbol (str):
             Symbol name used to determine the appropriate order filling policy
             through the internal `_get_type_filling()` helper.
 
-        deviation_points : int
+        deviation_points (int):
             Maximum allowed price deviation, in points, when executing market
             orders.
 
-        logger : logging.Logger | None, optional
+        logger (logging.Logger | None, optional):
             Logger instance used for diagnostic and error messages. If None,
             logging output is handled only by the class' internal logic.
 

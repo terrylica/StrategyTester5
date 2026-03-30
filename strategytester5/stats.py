@@ -5,6 +5,7 @@ from scipy.stats import linregress
 import pandas as pd
 import warnings
 
+
 # np.seterr(all="raise")  # turn numpy warnings into exceptions
 # warnings.filterwarnings("error")
 
@@ -68,16 +69,33 @@ def _max_dd_money_and_pct_nb(x: np.ndarray, eps: float = 1e-12):
 
     return max_dd if max_dd > 0.0 else 0.0, max_pct if max_pct > 0.0 else 0.0
 
+
 class TesterStats:
+    """ Computes various statistics from the tester results, including trade performance metrics, drawdowns, and more.
+
+    This class is responsible fo calculating all the stats you see in the HTML report"""
+
     def __init__(self,
-                deals: list,
-                initial_deposit: float,
-                balance_curve: np.ndarray,
-                equity_curve: np.ndarray,
-                margin_level_curve: np.ndarray,
-                ticks: int,
-                symbols: int
-                ):
+                 deals: list,
+                 initial_deposit: float,
+                 balance_curve: np.ndarray,
+                 equity_curve: np.ndarray,
+                 margin_level_curve: np.ndarray,
+                 ticks: int,
+                 symbols: int
+                 ):
+
+        """ Initializes the TesterStats object with the provided data and computes all statistics.
+
+        Args:
+            deals (list): List of deal records from the tester.
+            initial_deposit (float): The initial deposit amount used in the test.
+            balance_curve (np.ndarray): Array representing the balance curve over time.
+            equity_curve (np.ndarray): Array representing the equity curve over time.
+            margin_level_curve (np.ndarray): Array representing the margin level curve over time.
+            ticks (int): Total number of ticks processed during the test.
+            symbols (int): Total number of unique symbols traded during the test.
+        """
 
         self.deals = deals
         self.initial_deposit = float(initial_deposit)
@@ -203,117 +221,145 @@ class TesterStats:
 
     @property
     def total_trades(self) -> int:
+        """ Total number of trades opened and closed during the test. """
         return self._total_trades
 
     @property
     def total_deals(self) -> int:
-        return len(self.deals)-1
+        """The total number of deal records, including both entries and exits. Note that the first deal is usually the initial deposit and is not a real trade."""
+        return len(self.deals) - 1
 
     @property
     def total_short_trades(self) -> int:
+        """ Total number of short (SELL) trades closed during the test. """
         return self._total_short_trades
 
     @property
     def total_long_trades(self) -> int:
+        """ Total number of long (BUY) trades closed during the test. """
         return self._total_long_trades
 
     @property
     def short_trades_won(self) -> int:
+        """ Number of short (SELL) trades that were profitable (profit > 0) at closing. """
         return self._short_trades_won
 
     @property
     def long_trades_won(self) -> int:
+        """ Number of long (BUY) trades that were profitable (profit > 0) at closing. """
         return self._long_trades_won
 
     @property
     def profit_trades(self) -> int:
+        """ Number of trades that were profitable (profit > 0) at closing. """
         return len(self._profits) if self._profits else 0
 
     @property
     def loss_trades(self) -> int:
+        """ Number of trades that were not profitable (profit <= 0) at closing. """
         return len(self._losses) if self._losses else 0
 
     @property
     def largest_profit_trade(self) -> float:
+        """ Largest profit from a single trade. """
         return np.max(self._profits) if self._profits else 0
 
     @property
     def largest_loss_trade(self) -> float:
+        """ Largest loss from a single trade. """
         return np.min(self._losses) if self._losses else 0
 
     @property
     def average_profit_trade(self) -> float:
+        """ Average profit from profitable trades. """
         return np.mean(self._profits) if self._profits else 0
 
     @property
     def average_loss_trade(self) -> float:
+        """ Average loss from unprofitable trades. """
         return np.mean(self._losses) if self._losses else 0
 
     # ---------- streak metrics ----------
 
     @property
     def maximum_consecutive_wins_count(self) -> int:
+        """ Maximum number of consecutive winning trades. """
         return self._max_consec_win_count
 
     @property
     def maximum_consecutive_wins_money(self) -> float:
+        """ Maximum money won from consecutive winning trades. """
         return self._max_consec_win_money
 
     @property
     def maximum_consecutive_losses_count(self) -> int:
+        """ Maximum number of consecutive losing trades. """
         return self._max_consec_loss_count
 
     @property
     def maximum_consecutive_losses_money(self) -> float:
+        """ Maximum money lost from consecutive losing trades. """
         # show as absolute money if you prefer; MT5 shows total loss (negative) in brackets
         return self._max_consec_loss_money
 
     @property
     def maximal_consecutive_profit_count(self) -> int:
+        """ Maximum number of consecutive profitable trades. """
         return self._max_profit_streak_count
 
     @property
     def maximal_consecutive_profit_money(self) -> float:
+        """ Maximum money won from consecutive profitable trades. """
         return self._max_profit_streak_money
 
     @property
     def maximal_consecutive_loss_count(self) -> int:
+        """ Maximum number of consecutive losing trades. """
         return self._max_loss_streak_count
 
     @property
     def maximal_consecutive_loss_money(self) -> float:
+        """ Maximum money lost from consecutive losing trades. """
         return self._max_loss_streak_money
 
     @property
     def average_consecutive_wins(self) -> float:
+        """ Average profit from consecutive winning trades. """
         return np.mean(self._win_streaks) if self._win_streaks else 0
 
     @property
     def average_consecutive_losses(self) -> float:
+        """ Average loss from consecutive losing trades. """
         return np.mean(self._loss_streaks) if self._loss_streaks else 0
 
     @property
     def gross_profit(self) -> float:
+        """ Total profit from all profitable trades. """
         return np.sum(self._profits) if self._profits else 0.0
 
     @property
     def gross_loss(self) -> float:
+        """ Total loss from all unprofitable trades. """
         return np.sum(self._losses) if self._losses else 0.0
 
     @property
     def net_profit(self) -> float:
+        """ Net profit (gross profit - gross loss). """
         return self.gross_profit - np.abs(self.gross_loss)
 
     @property
     def profit_factor(self) -> float:
+        """ Profit factor (gross profit / gross loss). """
         return self.gross_profit / (self.gross_loss + self.eps)
 
     @property
     def recovery_factor(self) -> float:
+        """ Recovery factor (net profit / maximal equity drawdown). """
         return self.net_profit / (self.equity_drawdown_maximal + self.eps)
 
     @property
     def expected_payoff(self) -> int:
+        """ Expected payoff (net profit / total trades). """
         return (self.net_profit / self.total_trades) if self.total_trades > 0 else 0
 
     # ---------- drawdowns ----------
@@ -327,15 +373,18 @@ class TesterStats:
 
     @property
     def balance_drawdown_absolute(self) -> float:
+        """ Absolute drawdown for balance curve. """
         # AbsoluteDrawDown = InitialDeposit - MinimalBalance (below initial) :contentReference[oaicite:12]{index=12}
         return self._abs_drawdown(self.initial_deposit, self.balance_curve)
 
     @property
     def equity_drawdown_absolute(self) -> float:
+        """ Absolute drawdown for equity curve. """
         return self._abs_drawdown(self.initial_deposit, self.equity_curve)
 
     @property
     def balance_drawdown_maximal(self) -> float:
+        """ MT5 maximal drawdown uses local-high, next local low definition, which can be different from absolute drawdown. """
         return float(_max_dd_money_and_pct_nb(self.balance_curve)[0])
 
     def _validate_baleq_values(self, value: float) -> float:
@@ -346,15 +395,17 @@ class TesterStats:
 
     @property
     def balance_drawdown_relative(self) -> float:
-        """ MT5 relative drawdown uses local high -> next local low (max %)"""
+        """ MT5 relative drawdown uses local high, next local low (max %)"""
         return self._validate_baleq_values(float(_max_dd_money_and_pct_nb(self.balance_curve)[1]))
 
     @property
     def equity_drawdown_maximal(self) -> float:
+        """ MT5 maximal drawdown uses local-high, next local low definition, which can be different from absolute drawdown. """
         return self._validate_baleq_values(float(_max_dd_money_and_pct_nb(self.equity_curve)[0]))
 
     @property
     def equity_drawdown_relative(self) -> float:
+        """ MT5 relative drawdown uses local high, next local low (max %)"""
         return self._validate_baleq_values(float(_max_dd_money_and_pct_nb(self.equity_curve)[1]))
 
     @property
@@ -385,8 +436,8 @@ class TesterStats:
         if n < 2:
             return 0.0
 
-        n1 = sum(seq)          # wins
-        n2 = n - n1            # losses
+        n1 = sum(seq)  # wins
+        n2 = n - n1  # losses
         if n1 == 0 or n2 == 0:
             return 0.0
 
@@ -406,6 +457,7 @@ class TesterStats:
 
     @property
     def ahpr_factor(self) -> float:
+        """ AHPR = (1 + r1) * (1 + r2) * ... * (1 + rn)^(1/n) - 1, where r_i are per-trade returns in fraction (e.g., 0.01 = +1%) """
         r = np.asarray(self._trade_returns, dtype=np.float64)
         if r.size == 0:
             return 1.0
@@ -413,10 +465,12 @@ class TesterStats:
 
     @property
     def ahpr_percent(self) -> float:
+        """ AHPR in percent form. """
         return float((self.ahpr_factor - 1.0) * 100.0)
 
     @property
     def ghpr_factor(self) -> float:
+        """ GHPR = ((1 + r1) * (1 + r2) * ... * (1 + rn))^(1/n) - 1, where r_i are per-trade returns in fraction (e.g., 0.01 = +1%) """
         r = np.asarray(self._trade_returns, dtype=np.float64)
         if r.size == 0:
             return 1.0
@@ -424,14 +478,17 @@ class TesterStats:
 
     @property
     def ghpr_percent(self) -> float:
+        """ GHPR in percent form. """
         return float((self.ghpr_factor - 1.0) * 100.0)
 
     @property
     def lr_correlation(self) -> float:
+        """ Correlation coefficient (r-value) from linear regression of balance curve over time. """
         return np.nan if not self.lr_res else self.lr_res.rvalue
 
     @property
     def lr_standard_error(self) -> float:
+        """ Standard error of the estimate from linear regression of balance curve over time. """
         return np.nan if not self.lr_res else self.lr_res.stderr
 
     @property
@@ -440,11 +497,12 @@ class TesterStats:
 
     @property
     def margin_level(self) -> float:
-        return np.min(self.margin_level_curve) if len(self.margin_level_curve)>0 else np.nan
+        """ Minimum margin level (%) during the test. """
+        return np.min(self.margin_level_curve) if len(self.margin_level_curve) > 0 else np.nan
 
     @staticmethod
     def holding_time_calculator(entry_time: pd.Series, exit_time: pd.Series) -> dict:
-
+        """ Calculates holding time statistics (min, max, average) for trades based on entry and exit times of positions. """
         durations = exit_time - entry_time
 
         if durations.empty:
@@ -459,28 +517,42 @@ class TesterStats:
             "avg": durations.mean(),
         }
 
+
 class EntriesCalculator:
+    """ Calculates entry counts by hour, weekday, and month based on the deals data. """
+
     def __init__(self, deals_df: pd.DataFrame):
-        self.deals_df = deals_df.query(f"entry=={MetaTrader5Constants.DEAL_ENTRY_IN} and (type=={MetaTrader5Constants.DEAL_TYPE_SELL} or type=={MetaTrader5Constants.DEAL_TYPE_BUY})").copy()
+        self.deals_df = deals_df.query(
+            f"entry=={MetaTrader5Constants.DEAL_ENTRY_IN} and (type=={MetaTrader5Constants.DEAL_TYPE_SELL} or type=={MetaTrader5Constants.DEAL_TYPE_BUY})").copy()
 
         self.deals_df["hour"] = self.deals_df["time"].dt.hour
         self.deals_df["weekday"] = self.deals_df["time"].dt.weekday
         self.deals_df["month"] = self.deals_df["time"].dt.month
 
     def by_hour(self) -> pd.Series:
+        """ Returns a Series with the count of entries for each hour of the day (0-23). """
         return self.deals_df.groupby("hour")["entry"].size().reindex(range(24), fill_value=0)
 
     def by_weekday(self) -> pd.Series:
+        """ Returns a Series with the count of entries for each weekday (0=Monday, 6=Sunday). """
         return self.deals_df.groupby("weekday")["entry"].size().reindex(range(7), fill_value=0)
 
     def by_month(self) -> pd.Series:
-        return self.deals_df.groupby("month")["entry"].size().reindex(range(12), fill_value=0)
+        """ Returns a Series with the count of entries for each month (1-12). """
+        return self.deals_df.groupby("month")["entry"].size().reindex(range(1, 13), fill_value=0)
 
 
 class PLCalculator:
-    def __init__(self, deals_df: pd.DataFrame):
+    """ Calculates profit and loss statistics by hour, weekday, and month based on the deals data. """
 
-        self.deals_df = deals_df.query(f"entry == {MetaTrader5Constants.DEAL_ENTRY_OUT} and (type=={MetaTrader5Constants.DEAL_TYPE_BUY} | type=={MetaTrader5Constants.DEAL_TYPE_SELL})").copy()
+    def __init__(self, deals_df: pd.DataFrame):
+        """
+        Args:
+            deals_df (pd.DataFrame): DataFrame containing deal records with columns like 'entry', 'type', 'profit', 'commission', and 'time'.
+        """
+
+        self.deals_df = deals_df.query(
+            f"entry == {MetaTrader5Constants.DEAL_ENTRY_OUT} and (type=={MetaTrader5Constants.DEAL_TYPE_BUY} | type=={MetaTrader5Constants.DEAL_TYPE_SELL})").copy()
 
         self.deals_df["hour"] = self.deals_df["time"].dt.hour
         self.deals_df["weekday"] = self.deals_df["time"].dt.weekday
@@ -492,19 +564,26 @@ class PLCalculator:
         self.deals_df["loss"] = net.clip(upper=0.0)
 
     def loss_by_hour(self) -> pd.Series:
+        """ Returns a Series with the total loss for each hour of the day (0-23). """
         return self.deals_df.groupby("hour")["loss"].sum().reindex(range(24), fill_value=0)
 
     def profit_by_hour(self) -> pd.Series:
+        """ Returns a Series with the total profit for each hour of the day (0-23). """
         return self.deals_df.groupby("hour")["profit"].sum().reindex(range(24), fill_value=0)
 
     def loss_by_weekday(self) -> pd.Series:
+        """ Returns a Series with the total loss for each weekday (0=Monday, 6=Sunday). """
+
         return self.deals_df.groupby("weekday")["loss"].sum().reindex(range(7), fill_value=0)
 
     def profit_by_weekday(self) -> pd.Series:
+        """ Returns a Series with the total profit for each weekday (0=Monday, 6=Sunday). """
         return self.deals_df.groupby("weekday")["profit"].sum().reindex(range(7), fill_value=0)
 
     def loss_by_month(self) -> pd.Series:
-        return self.deals_df.groupby("month")["loss"].sum().reindex(range(12), fill_value=0)
+        """ Returns a Series with the total loss for each month (1-12). """
+        return self.deals_df.groupby("month")["loss"].sum().reindex(range(1, 13), fill_value=0)
 
     def profit_by_month(self) -> pd.Series:
-        return self.deals_df.groupby("month")["profit"].sum().reindex(range(12), fill_value=0)
+        """ Returns a Series with the total profit for each month (1-12). """
+        return self.deals_df.groupby("month")["profit"].sum().reindex(range(1, 13), fill_value=0)

@@ -3,16 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
-from . import StrategyTester
-from .. import MetaTrader5
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
 
 
 class CSymbolInfo:
-    def __init__(self, symbol: str, terminal: Union[StrategyTester|MetaTrader5]) -> None:
+    def __init__(self, symbol: str, terminal: Union[OverLoadedMetaTrader5API|MetaTrader5]) -> None:
         
         """
-        CSymbolInfo
-        -----------
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `CSymbolInfo` and provides convenient, read-only access to MetaTrader 5
         symbol properties.
@@ -21,11 +19,11 @@ class CSymbolInfo:
         information. Symbol data can be refreshed via `refresh()`, while quote/tick
         data can be refreshed via `refresh_rates()`.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/csymbolinfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/csymbolinfo)
 
         Parameters
         ----------
-        terminal : MetaTrader5 module-like or the StrategyTester instance.
+        terminal : Initialize native MetaTrader5 API or the simulated one from the StrategyTester instance
 
         Notes
         -----
@@ -33,28 +31,9 @@ class CSymbolInfo:
         - `refresh_rates()` updates the cached tick/quote values.
         - If tick data is not refreshed yet, tick-related properties return their default cached values.
         - Time values are returned as timezone-aware UTC datetimes where applicable.
-
-        Method groups mirror the MQL5 layout:
-        - Controlling: Refresh, RefreshRates
-        - Properties: Name, Select, IsSynchronized
-        - Volumes: Volume, VolumeHigh, VolumeLow
-        - Miscellaneous: Time, Spread, SpreadFloat, TicksBookDepth
-        - Levels: StopsLevel, FreezeLevel
-        - Bid/Ask/Last prices
-        - Trade modes
-        - Swaps
-        - Margins and flags
-        - Quantization
-        - Contract sizes
-        - Text properties
-        - Session properties
-        - Generic accessors: InfoInteger, InfoDouble, InfoString
-        - Service functions: NormalizePrice
         """
         
         self.terminal = terminal
-        if isinstance(terminal, StrategyTester):
-            self.terminal = terminal.mt5_instance
 
         self._symbol: str = symbol
         self._info: Optional[Any] = None

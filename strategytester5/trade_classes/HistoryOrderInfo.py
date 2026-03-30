@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from typing import Union
 from .OrderInfo import COrderInfo
-from . import StrategyTester
-from .. import MetaTrader5, TradeOrder
+
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
+from strategytester5.MetaTrader5 import TradeOrder
 
 
 class CHistoryOrderInfo(COrderInfo):
-    def __init__(self, order: TradeOrder, tester: Union[StrategyTester|MetaTrader5]):
+    def __init__(self, order: TradeOrder, terminal: Union[OverLoadedMetaTrader5API|MetaTrader5]):
 
         """
-        CHistoryOrderInfo
-        -----------------
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `CHistoryOrderInfo` and provides convenient, read-only access to MetaTrader 5
         history order properties.
@@ -20,17 +20,14 @@ class CHistoryOrderInfo(COrderInfo):
         `self._order`. The selected order can be supplied at construction time or later
         via `select_order()` / `select_by_index()`.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/chistoryorderinfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/chistoryorderinfo)
 
         Parameters
         ----------
         order : Any, optional
             A history order object returned by MetaTrader 5 Python history functions
             such as `mt5.history_orders_get()`.
-        tester : MetaTrader5 module-like, optional
-            An object compatible with the MetaTrader5 Python API (default is the
-            imported `MetaTrader5` module). This allows dependency injection for
-            testing or custom terminal wrappers.
+        terminal : Initialize native MetaTrader5 API or the simulated one from the StrategyTester instance
 
         Notes
         -----
@@ -47,4 +44,4 @@ class CHistoryOrderInfo(COrderInfo):
         - Selection helpers: Ticket, SelectByIndex
         """
         
-        super().__init__(order, tester)
+        super().__init__(order, terminal)

@@ -27,7 +27,7 @@ tester = StrategyTester(tester_config=tester_configs["tester"], mt5_instance=mt5
 
 # ---------------------- inputs ----------------------------
 
-symbol = "USDJPY"
+symbol = "USDJPY" # it should be one among the symbols in symbols list from tester.json (config file/dictionary)
 timeframe = "PERIOD_H1"
 magic_number = 10012026
 slippage = 100
@@ -36,19 +36,18 @@ tp = 500
 
 # ---------------------------------------------------------
 
-logger = tester.logger
-
 m_trade = CTrade(terminal=tester.simulated_mt5, magic_number=magic_number, filling_type_symbol=symbol, deviation_points=slippage, logger=tester.logger)
-symbol_info = tester.simulated_mt5.symbol_info(symbol=symbol)
 
 def pos_exists(magic: int, type: int) -> bool:
-
+    """Check if position exists"""
     positions_found = tester.simulated_mt5.positions_get()
     for position in positions_found:
         if position.type == type and position.magic == magic:
             return True
 
     return False
+
+symbol_info = tester.simulated_mt5.symbol_info(symbol=symbol)
 
 def on_tick():
     

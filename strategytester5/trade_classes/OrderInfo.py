@@ -3,16 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
-from . import StrategyTester
-from ..import MetaTrader5, TradeOrder
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
+from strategytester5.MetaTrader5 import TradeOrder
 
 class COrderInfo:
 
-    def __init__(self, order: TradeOrder, terminal: Union[StrategyTester|MetaTrader5]) -> None:
+    def __init__(self, order: TradeOrder, terminal: Union[OverLoadedMetaTrader5API|MetaTrader5]) -> None:
         
         """
-        COrderInfo
-        ----------
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `COrderInfo` and provides convenient, read-only access to the currently
         selected pending/open order properties in MetaTrader 5.
@@ -21,14 +20,13 @@ class COrderInfo:
         You may select an order directly with `select_order(order)`, by ticket using
         `select(ticket)`, or by index using `select_by_index(index)`.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/corderinfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/corderinfo)
 
-        Parameters
-        ----------
-        order : TradeOrder
+        Args:
+        order (TradeOrder):
             A tuple representing an order, typically obtained from `mt5.history_orders_get()` or `mt5.orders_get()`. This should be a structure compatible with the MetaTrader5 Python API's order representation.
             
-        terminal : MetaTrader5 module-like or the StrategyTester instance
+        terminal (Any): Initialize native MetaTrader5 API or the simulated one from the StrategyTester instance
 
         Notes
         -----
@@ -39,8 +37,6 @@ class COrderInfo:
         """
         
         self.terminal = terminal
-        if isinstance(terminal, StrategyTester):
-            self.terminal = terminal.mt5_instance
 
         self._order = order
         

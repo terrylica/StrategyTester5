@@ -1,15 +1,12 @@
 from __future__ import annotations
 from typing import Optional, Union
-from . import StrategyTester
-from .. import MetaTrader5
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
 
 class CAccountInfo:
-    def __init__(self, terminal: Union[StrategyTester|MetaTrader5]):
+    def __init__(self, terminal: Union[OverLoadedMetaTrader5API|MetaTrader5]):
         
         """
-        CAccountInfo
-        ------------
-        
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `CAccountInfo` and provides convenient, read-only access to the properties of
         the currently connected MetaTrader 5 trading account.
@@ -19,11 +16,11 @@ class CAccountInfo:
         (balance, equity, margin, etc.). If you need up-to-date values after trading
         activity or price changes, re-instantiate the class or implement a refresh.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/caccountinfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/caccountinfo)
 
-        Parameters
+        Args
         ----------
-        terminal : MetaTrader5 module-like or StrategyTester instance.
+        terminal : MetaTrader5 module-like or simulated/overloaded MetaTrader5 instance.
 
         Raises
         ------
@@ -40,8 +37,6 @@ class CAccountInfo:
         """
         
         self.terminal = terminal
-        if isinstance(terminal, StrategyTester):
-            self.terminal = terminal.mt5_instance
         
         self._account_info = self.terminal.account_info()
         if self._account_info is None:
@@ -223,7 +218,7 @@ class CAccountInfo:
     def max_lot_check(self, symbol: str, order_type: int, price: float, percent: float = 100.0) -> Optional[float]: 
         """ Estimates the maximum tradable volume based on available margin. 
         
-        Parameters 
+        Args
         ---------- 
         percent : float Percentage of free margin to use (0..100). 
         

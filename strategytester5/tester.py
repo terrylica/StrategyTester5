@@ -29,67 +29,79 @@ mpl.rcParams["agg.path.chunksize"] = 10000
 mpl.rcParams["path.simplify"] = True
 mpl.rcParams["path.simplify_threshold"] = 0.9
 
+
 class StrategyTester:
+    """
+        The "engine" that drives the entire backtesting process, simulating the MetaTrader5 environment and allowing you to test your trading strategies against historical data. The main method is `run()`, which takes a callback function that contains your strategy logic and executes it on each tick or bar, depending on the modelling mode you choose.
+
+        > Similar to the MetaTrader5 strategy tester
+    """
+
     def __init__(self,
                  tester_config: dict,
                  mt5_instance: Any,
                  logging_level: int = logging.WARNING,
-                 logs_dir: Optional[str]="Logs",
-                 reports_dir: Optional[str]="Reports",
-                 history_dir: Optional[str]="History",
+                 logs_dir: Optional[str] = "Logs",
+                 reports_dir: Optional[str] = "Reports",
+                 history_dir: Optional[str] = "History",
                  trading_history_dir: Optional[str] = "TradingHistory",
                  polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto"):
-        
-        """MetaTrader 5-Like Strategy tester for the MetaTrader5-Python module.
+
+        """Instanciates the StrategyTester with the given configuration, sets up the simulated MetaTrader5 environment, and prepares for running the backtest.
 
         Args:
             tester_config (dict): Dictionary of tester configuration values.
+
             mt5_instance (MetaTrader5): MetaTrader5 API/client instance used for obtaining crucial information from the broker as an attempt to mimic the terminal.
+
             logging_level: Minimum severity of messages to record. Uses standard `logging` levels (e.g., logging.DEBUG, INFO, WARNING, ERROR, CRITICAL). Messages below this level are ignored.
+
             logs_dir (str): Directory for log files.
             reports_dir (str): Directory for HTML reports and assets.
             history_dir (str): Directory for historical data storage.
-`           trading_history_dir (str | optional) A directory to keep trading history.
+            trading_history_dir (str | optional) A directory to keep trading history.
 
-             polars_collect_engine (str): Engine used by Polars when collecting historical data in functions for obtaining ticks — copy_ticks*, and bars information/rates (copy_rates*). Supported values are:
+            polars_collect_engine (str): Engine used by Polars when collecting historical data in functions for obtaining ticks — copy_ticks*, and bars information/rates (copy_rates*). Supported values are:
                 - ``"auto"`` (default): Use Polars’ standard in-memory engine and
-                  respect the ``POLARS_ENGINE_AFFINITY`` environment variable if set.
+                    respect the ``POLARS_ENGINE_AFFINITY`` environment variable if set.
                 - ``"in-memory"``: Explicitly use the default in-memory engine,
-                  optimized with multi-threading and SIMD over Arrow data.
+                    optimized with multi-threading and SIMD over Arrow data.
                 - ``"streaming"``: Process queries in batches, enabling
-                  larger-than-RAM datasets.
+                    larger-than-RAM datasets.
                 - ``"gpu"``: Use NVIDIA GPUs via RAPIDS cuDF for accelerated execution.
-                  Requires installing Polars with GPU support, e.g.:
-                  ``pip install polars[gpu] --extra-index-url=https://pypi.nvidia.com``.
+                    Requires installing Polars with GPU support, e.g.:
+                    ``pip install polars[gpu] --extra-index-url=https://pypi.nvidia.com``.
         Raises:
             RuntimeError: If required MT5 account info cannot be obtained.
         """
-        
+
         self.reports_dir = reports_dir
         self.history_dir = history_dir
         self.polars_collect_engine = polars_collect_engine
         self.trading_history_dir = trading_history_dir
 
         # ---------------- validate all configs from a dictionary -----------------
-        
+
         self.tester_config = TesterConfigValidators.parse_tester_configs(tester_config)
 
         # -------------------- initialize the Loggers ----------------------------
-        
+
         self.ea_name = self.tester_config["bot_name"]
         os.makedirs(logs_dir, exist_ok=True)
 
-        self.logger = get_logger(task_name=self.ea_name, logfile=os.path.join(logs_dir, f"{LOG_DATE}.log"), level=logging_level, time_provider=self._get_sim_time)
+        self.logger = get_logger(task_name=self.ea_name, logfile=os.path.join(logs_dir, f"{LOG_DATE}.log"),
+                                 level=logging_level, time_provider=self._get_sim_time)
 
         self.live_mt5_instance = mt5_instance
         if self.live_mt5_instance is None:
-            raise RuntimeError("Fatal, A live MetaTrader5 Instance isn't given. If you haven't installed it (WINDOWS-ONLY) run `pip install metatrader5`")
+            raise RuntimeError(
+                "Fatal, A live MetaTrader5 Instance isn't given. If you haven't installed it (WINDOWS-ONLY) run `pip install metatrader5`")
 
         self.broker_data_dir = self.live_mt5_instance.account_info().server
-        self.simulated_mt5 = OverLoadedMetaTrader5API(logger=self.logger, 
-                                                       broker_data_path=self.broker_data_dir,
-                                                       polars_collect_engine=polars_collect_engine,
-                                                       live_mt5=self.live_mt5_instance)
+        self.simulated_mt5 = OverLoadedMetaTrader5API(logger=self.logger,
+                                                      broker_data_path=self.broker_data_dir,
+                                                      polars_collect_engine=polars_collect_engine,
+                                                      live_mt5=self.live_mt5_instance)
 
         start_dt = self.tester_config.get("start_date", 0)
         start_dt_ts = start_dt.timestamp() if isinstance(start_dt, datetime) else start_dt
@@ -106,7 +118,7 @@ class StrategyTester:
             leverage=int(self.tester_config["leverage"]),
 
             # ---- simulator-controlled financials ----
-            balance=deposit,                # simulator starting balance
+            balance=deposit,  # simulator starting balance
             credit=0,
             profit=0.0,
             equity=deposit,
@@ -125,7 +137,7 @@ class StrategyTester:
         self.positions_total_margin = 0
 
         # -------------------- tester reports ----------------------------
-        
+
         self.tester_curves = {
             "time": np.array([]),
             "balance": np.array([]),
@@ -164,7 +176,7 @@ class StrategyTester:
         if t is None:
             return datetime.now(tz=timezone.utc)
 
-        return datetime.fromtimestamp(t/1000, tz=timezone.utc)
+        return datetime.fromtimestamp(t / 1000, tz=timezone.utc)
 
     def _positions_monitoring(self):
         """
@@ -179,8 +191,8 @@ class StrategyTester:
         self.positions_total_margin = 0
         self.positions_unrealized_pl = 0
 
-        for i in range(positions_found- 1, -1, -1):
-            
+        for i in range(positions_found - 1, -1, -1):
+
             pos = self.simulated_mt5.POSITIONS[i]
             tick = self.simulated_mt5.symbol_info_tick(pos.symbol)
 
@@ -198,16 +210,16 @@ class StrategyTester:
             # --- Update floating profit ---
 
             profit = self.simulated_mt5.order_calc_profit(
-                    order_type=pos.type,
-                    symbol=pos.symbol,
-                    volume=pos.volume,
-                    price_open=pos.price_open,
-                    price_close=price
-                )
-            
+                order_type=pos.type,
+                symbol=pos.symbol,
+                volume=pos.volume,
+                price_open=pos.price_open,
+                price_close=price
+            )
+
             self.positions_unrealized_pl += profit
             self.positions_total_margin += pos.margin
-            
+
             # --- Check SL / TP ---
             hit_tp = False
             hit_sl = False
@@ -223,7 +235,7 @@ class StrategyTester:
                     price <= pos.sl if pos.type == self.simulated_mt5.POSITION_TYPE_BUY
                     else price >= pos.sl
                 )
-                
+
             pos = pos._replace(
                 profit=profit,
                 price_current=price,
@@ -233,7 +245,7 @@ class StrategyTester:
 
             # MUST write it back
             self.simulated_mt5.POSITIONS[i] = pos
-            
+
             if not (hit_tp or hit_sl):
                 continue
 
@@ -255,14 +267,13 @@ class StrategyTester:
         # ------- monitor the account only if there is at least one position ------
 
         if (len(self.simulated_mt5.POSITIONS) > 0) if pos_must_exist else True:
-
             new_equity = self.simulated_mt5.ACCOUNT.balance + self.positions_unrealized_pl
             self.simulated_mt5.ACCOUNT = self.simulated_mt5.ACCOUNT._replace(
                 profit=self.positions_unrealized_pl,
                 equity=new_equity,
                 margin=self.positions_total_margin,
-                margin_free = new_equity - self.positions_total_margin,
-                margin_level = new_equity / self.positions_total_margin * 100 if self.positions_total_margin > 0 else np.inf
+                margin_free=new_equity - self.positions_total_margin,
+                margin_level=new_equity / self.positions_total_margin * 100 if self.positions_total_margin > 0 else np.inf
             )
 
         # ---------- evaluate the margin ---------------------
@@ -281,9 +292,9 @@ class StrategyTester:
             # self.logger.debug(f"balance {self.simulated_mt5.ACCOUNT.balance}, equity: {self.simulated_mt5.ACCOUNT.equity}, margin: {self.simulated_mt5.ACCOUNT.margin}, margin level: {self.simulated_mt5.ACCOUNT.margin_level}")
             self.IS_STOPPED = True
         """
-        
+
     def _pending_orders_monitoring(self):
-        
+
         """
         Monitors pending orders:
         - handles expiration
@@ -310,7 +321,7 @@ class StrategyTester:
                 new_price_current = bid
                 final_pos_type = self.simulated_mt5.POSITION_TYPE_SELL
 
-            updated_order = order._replace(price_current=new_price_current) #price mod ASAP
+            updated_order = order._replace(price_current=new_price_current)  # price mod ASAP
             self.simulated_mt5.ORDERS[i] = updated_order
 
             order = updated_order
@@ -319,7 +330,6 @@ class StrategyTester:
 
             expiration_time = order.time_expiration
             if expiration_time and self.simulated_mt5.current_time >= expiration_time:
-
                 request = {
                     "action": self.simulated_mt5.TRADE_ACTION_REMOVE,
                     "order": order.ticket,
@@ -328,7 +338,7 @@ class StrategyTester:
                 }
 
                 self.simulated_mt5.order_send(request)
-                self.simulated_mt5.ORDERS.pop(i) # safely remove a pending order that expired
+                self.simulated_mt5.ORDERS.pop(i)  # safely remove a pending order that expired
                 self.logger.debug(f"Pending order #{order.ticket} expired!")
                 continue
 
@@ -381,7 +391,7 @@ class StrategyTester:
                 "volume": order.volume_current,
                 "magic": order.magic,
                 "comment": order.comment,
-                "order": order.ticket, # an additional field to use for tracking history of this order
+                "order": order.ticket,  # an additional field to use for tracking history of this order
             }
 
             self.simulated_mt5.order_send(request)
@@ -419,7 +429,12 @@ class StrategyTester:
             on_tick_function,
     ):
         """
-        Drives the strategy tester using grouped tick events.
+        This function Drives the strategy tester using grouped tick events.
+
+        Args:
+            df (pl.DataFrame): A Polars DataFrame containing tick data, with columns for time, symbol_id, bid, ask, etc.
+            symbols (list[str]): A list mapping symbol_id to actual symbol names.
+            on_tick_function: A callback function that executes the strategy logic on each tick. This function is called after all ticks for a given timestamp are processed and the simulated MetaTrader5 instance is updated with the latest tick information.
         """
 
         total_rows = df.height
@@ -441,7 +456,7 @@ class StrategyTester:
 
                 # update progress AFTER processing group
                 processed += n
-                self.TESTER_IDX+=1 # increment tester progress
+                self.TESTER_IDX += 1  # increment tester progress
 
                 pbar.update(n)
 
@@ -454,8 +469,14 @@ class StrategyTester:
             symbols: list[str],
             on_tick_function,
     ):
+
         """
-        Drives the strategy tester using grouped tick events.
+        This function Drives the strategy tester using grouped bars.
+
+        Args:
+            df (pl.DataFrame): A Polars DataFrame containing bars data, with columns for time, open, high, low, close, etc.
+            symbols (list[str]): A list mapping symbol_id to actual symbol names.
+            on_tick_function: A callback function that executes the strategy logic on each tick. This function is called after all ticks for a given timestamp are processed and the simulated MetaTrader5 instance is updated with the latest tick information.
         """
 
         total_rows = df.height
@@ -469,7 +490,6 @@ class StrategyTester:
 
                 # process all ticks at this timestamp
                 for row in rows.iter_rows(named=True):
-
                     symbol = symbols[row["symbol_id"]]
                     point = self.simulated_mt5.symbol_info(symbol).point
                     t = row["time"]
@@ -491,7 +511,7 @@ class StrategyTester:
 
                 # update progress AFTER processing group
                 processed += n
-                self.TESTER_IDX+=1 # increment tester progress
+                self.TESTER_IDX += 1  # increment tester progress
 
                 pbar.update(n)
 
@@ -499,6 +519,15 @@ class StrategyTester:
                 on_tick_function()
 
     def run(self, on_tick_function: Any) -> stats.TesterStats:
+
+        """Main function to run the strategy tester simulation. It initializes the tester, processes historical data according to the specified modelling mode, and generates a report at the end.
+
+        Args:
+            on_tick_function: A callback function that executes the strategy logic on each tick. This function is called after all ticks for a given timestamp are processed and the simulated MetaTrader5 instance is updated with the latest tick information.
+
+        Returns:
+            TesterStats: An object containing various statistics computed from the tester results, including trade performance metrics, drawdowns, and more. This is the same stats object that is used to generate the final HTML report.
+        """
 
         start_date = self.tester_config["start_date"]
         end_date = self.tester_config["end_date"]
@@ -529,7 +558,7 @@ class StrategyTester:
                 self.polars_collect_engine
             )
 
-            self._tester_init(size=df.height) # initialize the tester
+            self._tester_init(size=df.height)  # initialize the tester
 
             # run simulation
             self.run_tick_simulation(
@@ -542,14 +571,15 @@ class StrategyTester:
 
             df = history_manager.build_bar_stream(
                 symbols,
-                self.simulated_mt5.STRING2TIMEFRAME_MAP["M1"] if modelling == 1 else self.simulated_mt5.STRING2TIMEFRAME_MAP[timeframe],
+                self.simulated_mt5.STRING2TIMEFRAME_MAP["M1"] if modelling == 1 else
+                self.simulated_mt5.STRING2TIMEFRAME_MAP[timeframe],
                 start_date,
                 end_date,
                 sync,
                 self.polars_collect_engine
             )
 
-            self._tester_init(size=df.height) # initialize the tester
+            self._tester_init(size=df.height)  # initialize the tester
 
             # run bar simulation
             self.run_bar_simulation(
@@ -629,14 +659,15 @@ class StrategyTester:
         n = int(self.CURVES_IDX)
 
         if n > 0:
-            self.tester_curves["balance"][n-1] = self.simulated_mt5.ACCOUNT.balance
-            self.tester_curves["equity"][n-1] = self.simulated_mt5.ACCOUNT.balance
-            self.tester_curves["margin_level"][n-1] = self.simulated_mt5.ACCOUNT.margin_level
+            self.tester_curves["balance"][n - 1] = self.simulated_mt5.ACCOUNT.balance
+            self.tester_curves["equity"][n - 1] = self.simulated_mt5.ACCOUNT.balance
+            self.tester_curves["margin_level"][n - 1] = self.simulated_mt5.ACCOUNT.margin_level
 
         # generate a report at the end
 
         os.makedirs(self.reports_dir, exist_ok=True)
-        self._gen_tester_report(output_file=os.path.join(self.reports_dir, f"{self.tester_config['bot_name']}-report.html"))
+        self._gen_tester_report(
+            output_file=os.path.join(self.reports_dir, f"{self.tester_config['bot_name']}-report.html"))
 
         self._save_trading_history(self.trading_history_dir)
 

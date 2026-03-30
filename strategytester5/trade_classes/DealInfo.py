@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Optional, Union
-from . import StrategyTester
-from .. import MetaTrader5, TradeDeal
+
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
+from strategytester5.MetaTrader5 import TradeDeal
 
 class CDealInfo:
-    def __init__(self, deal: TradeDeal, terminal: Union[StrategyTester|MetaTrader5]):
+    def __init__(self, deal: TradeDeal, terminal: Union[OverLoadedMetaTrader5API|MetaTrader5]):
         """
-        CDealInfo
-        ---------
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `CDealInfo` and provides convenient, read-only access to MetaTrader 5 deal
         properties.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cdealinfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cdealinfo)
         
         Parameters
         ----------
         
         deal (tuple) : A deal object (e.g., from `mt5.history_deals_get()`) to wrap and provide access to.
         
-        terminal (optional) : MetaTrader5 module-like or StrategyTester.
+        terminal (optional) : Native MetaTrader5 API or the simulated one.
 
         Notes
         -----
@@ -32,10 +32,7 @@ class CDealInfo:
         - This wrapper does not modify terminal state; it only reads/derives properties.
         """
 
-        self.terminal = terminal
-        if isinstance(terminal, StrategyTester):
-            self.terminal = terminal.mt5_instance
-
+        self.terminal = terminal.mt5_instance
         self._deal = deal
         
         if self._deal is None:

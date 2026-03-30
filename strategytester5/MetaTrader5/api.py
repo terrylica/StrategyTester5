@@ -14,11 +14,12 @@ from . import data
 import fnmatch
 from pathlib import Path
 
+
 class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def __init__(self,
                  logger: logging.Logger,
                  live_mt5: Any,
-                 broker_data_path: Optional[str]=config.DEFAULT_BROKER_DATA_PATH,
+                 broker_data_path: Optional[str] = config.DEFAULT_BROKER_DATA_PATH,
                  polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto"
                  ):
 
@@ -73,7 +74,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         self._current_time_msc: int = -1
 
         # ----------------- MetaTrader5-Like Containers-----------------
-        
+
         self.ACCOUNT = data.import_account_info(self.ac_info_json)
         self.TERMINAL_INFO = data.import_terminal_info(self.terminal_info_json)
 
@@ -89,9 +90,11 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         self._orders_counter = 0
 
     def current_time(self) -> int:
+        """Returns the current time in seconds since 1970.01.01 00:00:00, as obtained from the latest tick update."""
         return self._current_time
 
     def current_time_msc(self) -> int:
+        """Returns the current time in milliseconds since 1970.01.01 00:00:00, as obtained from the latest tick update."""
         return self._current_time_msc
 
     def _generate_order_history_ticket(self) -> int:
@@ -107,7 +110,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def _generate_position_ticket(self) -> int:
         self._positions_counter += 1
         return self._positions_counter
-    
+
     def last_error(self):
         """returns the last error from the terminal or the strategy tester"""
         return self._last_error
@@ -115,8 +118,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def account_info(self) -> Optional[AccountInfo]:
         """Gets info on the current trading account.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5accountinfo_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5accountinfo_py)
 
         Returns:
             Trading account's information in a namedtuple (tuple) called AccountInfo
@@ -127,8 +129,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def symbol_info(self, symbol: str) -> Optional[SymbolInfo]:
         """Gets data on the specified financial instrument.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5symbolinfo_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5symbolinfo_py)
 
         Returns:
             Symbol's information in a namedtuple (tuple) called SymbolInfo
@@ -143,8 +144,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def symbol_info_tick(self, symbol: str) -> Tick:
         """Gets the last tick for the specified financial instrument.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5symbolinfotick_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5symbolinfotick_py)
 
         Returns:
             Tick: Returns the tick data as a named tuple Tick. Returns None in case of an error. The info on the error can be obtained using last_error().
@@ -210,8 +210,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         RATES_DTYPE]:
         """Get bars in the specified date range from the MetaTrader 5 terminal.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesrange_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesrange_py)
 
         Args:
             symbol (str): Financial instrument name, for example, "EURUSD". Required unnamed parameter.
@@ -242,8 +241,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         """Get bars from the MetaTrader 5 terminal starting from the specified date.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesfrom_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesfrom_py)
 
         Args:
             symbol: Financial instrument name, for example, "EURUSD". Required unnamed parameter.
@@ -274,8 +272,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         """
         Get bars from the MetaTrader 5 terminal starting from the specified index.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesfrompos_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesfrompos_py)
 
         Parameters:
             symbol (str): Financial instrument name, for example, "EURUSD". Required unnamed parameter.
@@ -314,8 +311,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         """Get ticks for the specified date range from the MetaTrader 5 terminal.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5copyticksrange_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyticksrange_py)
 
         Args:
             symbol(str): Financial instrument name, for example, "EURUSD". Required unnamed parameter.
@@ -333,19 +329,19 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
             return None
 
         return self.history_manager.copy_ticks_range_from_parquet(symbol=symbol,
-                                                               date_from=date_from,
-                                                               date_to=date_to,
-                                                               polars_collect_engine=self.polars_collect_engine,
-                                                               broker_data_dir=self.broker_data_path,
-                                                               flags=flags,
-                                                               logger=self.logger)
+                                                                  date_from=date_from,
+                                                                  date_to=date_to,
+                                                                  polars_collect_engine=self.polars_collect_engine,
+                                                                  broker_data_dir=self.broker_data_path,
+                                                                  flags=flags,
+                                                                  logger=self.logger)
 
-    def copy_ticks_from(self, symbol: str, date_from: datetime, count: int, flags: int = MetaTrader5.COPY_TICKS_ALL) -> Optional[np.array]:
+    def copy_ticks_from(self, symbol: str, date_from: datetime, count: int, flags: int = MetaTrader5.COPY_TICKS_ALL) -> \
+    Optional[np.array]:
 
         """Get ticks from the MetaTrader 5 terminal starting from the specified date.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5copyticksfrom_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyticksfrom_py)
 
         Args:
             symbol(str): Financial instrument name, for example, "EURUSD". Required unnamed parameter.
@@ -363,12 +359,12 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
             return None
 
         return self.history_manager.copy_ticks_range_from_parquet(symbol=symbol,
-                                                               date_from=date_from,
-                                                               limit=count,
-                                                               polars_collect_engine=self.polars_collect_engine,
-                                                               broker_data_dir=self.broker_data_path,
-                                                               flags=flags,
-                                                               logger=self.logger)
+                                                                  date_from=date_from,
+                                                                  limit=count,
+                                                                  polars_collect_engine=self.polars_collect_engine,
+                                                                  broker_data_dir=self.broker_data_path,
+                                                                  flags=flags,
+                                                                  logger=self.logger)
 
     def orders_total(self) -> int:
 
@@ -380,11 +376,12 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         return len(self.ORDERS)
 
-    def orders_get(self, symbol: Optional[str] = None, group: Optional[str] = None, ticket: Optional[int] = None) -> Optional[tuple[TradeOrder]]:
+    def orders_get(self, symbol: Optional[str] = None, group: Optional[str] = None, ticket: Optional[int] = None) -> \
+    Optional[tuple[TradeOrder]]:
 
         """Get active orders with the ability to filter by symbol or ticket. There are three call options.
 
-        For more information: https://www.mql5.com/en/docs/python_metatrader5/mt5ordersget_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5ordersget_py)
 
         Args:
             symbol (str | optional): Symbol name. If a symbol is specified, the ticket parameter is ignored.
@@ -396,7 +393,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
             list: Returns info in the form of a tuple structure (TradeOrder). Return None in case of an error. The info on the error can be obtained using last_error().
         """
-
 
         orders = self.ORDERS
 
@@ -421,19 +417,18 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def positions_total(self) -> int:
         """Get the number of open positions in MetaTrader 5 client.
 
-        Read more: https://www.mql5.com/en/docs/python_metatrader5/mt5positionstotal_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5positionstotal_py)
         Returns:
             int: number of positions
         """
         return len(self.POSITIONS)
 
     def positions_get(self, symbol: Optional[str] = None, group: Optional[str] = None, ticket: Optional[int] = None) -> \
-    tuple[TradePosition]:
+            tuple[TradePosition]:
 
         """Get open positions with the ability to filter by symbol or ticket. There are three call options.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5positionsget_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5positionsget_py)
 
         Args:
             symbol (str | optional): Symbol name. If a symbol is specified, the ticket parameter is ignored.
@@ -466,13 +461,11 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         return tuple()
 
-
     def history_orders_total(self, date_from: datetime, date_to: datetime) -> int:
         """
         Get the number of orders in trading history within the specified interval.
 
-        For more information:
-        https://www.mql5.com/en/docs/python_metatrader5/mt5historyorderstotal_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5historyorderstotal_py)
 
         Args:
             date_from (datetime):
@@ -508,7 +501,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
           Get orders from trading history, with optional filtering by symbol group,
           order ticket, or position ticket.
 
-          For more information: https://www.mql5.com/en/docs/python_metatrader5/mt5historyordersget_py
+          [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5historyordersget_py)
 
           Args:
               date_from (datetime | None, optional):
@@ -579,7 +572,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         """
         Get the number of deals in history within the specified date range.
 
-        For more information: https://www.mql5.com/en/docs/python_metatrader5/mt5historydealstotal_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5historydealstotal_py)
 
         Args:
             date_from (datetime):
@@ -615,7 +608,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
                           ) -> Optional[tuple[TradeDeal]]:
         """Gets deals from trading history within the specified interval with the ability to filter by ticket or position.
 
-        For more information: https://www.mql5.com/en/docs/python_metatrader5/mt5historydealsget_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5historydealsget_py)
 
         Args:
             date_from (datetime): Date the orders are requested from. Set by the 'datetime' object or as a number of seconds elapsed since 1970.01.01.
@@ -773,7 +766,8 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         return self.TRADE_VALIDATORS_CACHE[symbol]
 
-    def _create_position_from_request(self, time: int, time_msc: float, request: TradeRequest, margin: Optional[float]=0.0) -> TradePosition:
+    def _create_position_from_request(self, time: int, time_msc: float, request: TradeRequest,
+                                      margin: Optional[float] = 0.0) -> TradePosition:
 
         ticket = self._generate_position_ticket()
 
@@ -800,10 +794,11 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
             # ---- additional fields ----
             # last_swap_time,
-            margin = margin,
+            margin=margin,
         )
 
-    def _create_order_from_request(self, time: int, time_msc: int, request: TradeRequest, state: int=MetaTrader5Constants.ORDER_STATE_PLACED) -> TradeOrder:
+    def _create_order_from_request(self, time: int, time_msc: int, request: TradeRequest,
+                                   state: int = MetaTrader5Constants.ORDER_STATE_PLACED) -> TradeOrder:
 
         ticket = self._generate_order_ticket()
 
@@ -834,7 +829,9 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
             external_id=0,
         )
 
-    def _create_deal_from_request(self, time: int, time_msc: float, entry: int, request: TradeRequest, position: TradePosition, commission: float = 0.0, swap: float=0.0, fee: float=0.0) -> TradeDeal:
+    def _create_deal_from_request(self, time: int, time_msc: float, entry: int, request: TradeRequest,
+                                  position: TradePosition, commission: float = 0.0, swap: float = 0.0,
+                                  fee: float = 0.0) -> TradeDeal:
 
         ticket = self._generate_deal_ticket()
         order = self._generate_order_ticket()
@@ -846,10 +843,10 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         sl = position.sl
         tp = position.tp
 
-        if round(price, digits) != round(sl, digits): # take profit is hit
+        if round(price, digits) != round(sl, digits):  # take profit is hit
             reason = self.DEAL_REASON_SL
 
-        if round(price, digits) != round(tp, digits): # stop loss is hit
+        if round(price, digits) != round(tp, digits):  # stop loss is hit
             reason = self.DEAL_REASON_TP
 
         return TradeDeal(
@@ -945,7 +942,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         future_margin = ac_info.margin + margin
         future_equity = ac_info.equity
 
-
         if future_margin > 0:
             future_margin_level = (future_equity / future_margin) * 100
         else:
@@ -984,11 +980,13 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         time_msc = tick.time_msc
 
         # craft a position and add it to history container/array
-        position = self._create_position_from_request(time=time, time_msc=time_msc, request=trade_request, margin=margin)
+        position = self._create_position_from_request(time=time, time_msc=time_msc, request=trade_request,
+                                                      margin=margin)
         self.POSITIONS.append(position)
 
         # craft a deal and add it to history
-        deal = self._create_deal_from_request(time=time, time_msc=time_msc, entry=self.DEAL_ENTRY_IN, request=trade_request, position=position)
+        deal = self._create_deal_from_request(time=time, time_msc=time_msc, entry=self.DEAL_ENTRY_IN,
+                                              request=trade_request, position=position)
         self.DEALS.append(deal)
 
         # store history of orders
@@ -997,7 +995,8 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         )
 
         self.logger.info(f"Position {deal.ticket} opened successfully!")
-        return self._make_result(trade_request, retcode=self.TRADE_RETCODE_DONE, deal=deal.ticket, order=deal.order, volume=position.volume)
+        return self._make_result(trade_request, retcode=self.TRADE_RETCODE_DONE, deal=deal.ticket, order=deal.order,
+                                 volume=position.volume)
 
     def _close_position(self, request: dict):
 
@@ -1242,7 +1241,8 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         # ---------------- PRICE VALIDATION ----------------
 
         if not validators.is_valid_pending_price(price, tick, order_type):
-            self.logger.debug(f"Invalid price for: {MetaTrader5Constants.ORDER_TYPE_MAP[order_type]} price: {price} ask: {tick.ask}")
+            self.logger.debug(
+                f"Invalid price for: {MetaTrader5Constants.ORDER_TYPE_MAP[order_type]} price: {price} ask: {tick.ask}")
             return self._make_result(trade_request, self.TRADE_RETCODE_INVALID_PRICE)
 
         # ---------------- SL / TP VALIDATION ----------------
@@ -1451,7 +1451,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         action = request.get("action")
 
         if action == self.TRADE_ACTION_DEAL:
-            if request.get("position"): # their subtle difference is a position
+            if request.get("position"):  # their subtle difference is a position
                 return self._close_position(request)
             else:
                 return self._open_position(request)
@@ -1470,7 +1470,6 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         self.logger.critical("Unknown trade action")
         return None
-
 
     def _terminate_all_positions(self, comment: str) -> bool:
 
@@ -1503,7 +1502,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
             if self.order_send(request) is None:
                 return False
-        
+
         return True
 
     def order_calc_profit(self,
@@ -1515,7 +1514,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         """
         Return profit in the account currency for a specified trading operation.
 
-        Read more: https://www.mql5.com/en/docs/python_metatrader5/mt5ordercalcprofit_py
+        [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5ordercalcprofit_py)
 
         Args:
             order_type (int): The type of position taken, either 0 (buy) or 1 (sell).

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from typing import Any, Optional, Union
-from . import StrategyTester
-from .. import MetaTrader5
+
+
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
 
 class CTerminalInfo:
-    def __init__(self, terminal: Union[StrategyTester|MetaTrader5]):
+    def __init__(self, terminal: Union[OverLoadedMetaTrader5API|MetaTrader5]):
         
         """
-        CTerminalInfo
-        -------------
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `CTerminalInfo` and provides convenient, read-only access to the properties
         of the MetaTrader 5 terminal environment.
@@ -18,11 +18,11 @@ class CTerminalInfo:
         The returned values reflect the terminal state at the moment of initialization.
         If you need up-to-date values, create a new instance or add a refresh method.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cterminalinfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cterminalinfo)
 
         Parameters
         ----------
-        terminal : MetaTrader5 module-like or the StrategyTester instance
+        terminal : Initialize native MetaTrader5 API or the simulated one from the StrategyTester instance
 
         Raises
         ------
@@ -38,9 +38,6 @@ class CTerminalInfo:
         """
 
         self.terminal = terminal
-        if isinstance(terminal, StrategyTester):
-            self.terminal = terminal.mt5_instance
-
         self._info = self.terminal.terminal_info()
 
         if self._info is None:

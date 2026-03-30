@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Optional, Union
-from . import StrategyTester
-from .. import MetaTrader5, TradePosition
+
+from strategytester5.MetaTrader5.api import OverLoadedMetaTrader5API
+import MetaTrader5
+from strategytester5.MetaTrader5 import TradePosition
 
 class CPositionInfo:
-    def __init__(self, position: TradePosition, terminal: Union[MetaTrader5|StrategyTester]) -> None:
+    def __init__(self, position: TradePosition, terminal: Union[MetaTrader5|OverLoadedMetaTrader5API]) -> None:
         
         """
-        CPositionInfo
-        -------------
         A lightweight Python wrapper that resembles the MQL5 Standard Library class
         `CPositionInfo` and provides convenient, read-only access to MetaTrader 5
         open position properties.
@@ -18,14 +18,14 @@ class CPositionInfo:
         This class wraps a single already-selected/open position object returned by
         the MetaTrader 5 Python API, such as from `mt5.positions_get()`.
 
-        Reference (MQL5): https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cpositioninfo
+        [MQL5 Reference](https://www.mql5.com/en/docs/standardlibrary/tradeclasses/cpositioninfo)
 
         Parameters
         ----------
         position : Any
             A position object returned by MetaTrader 5 Python API functions such as
             `mt5.positions_get()`.
-        terminal : MetaTrader5 module-like or the StrategyTester instance.
+        terminal : Initialize native MetaTrader5 API or the simulated one from the StrategyTester instance
 
         Notes
         -----
@@ -42,8 +42,6 @@ class CPositionInfo:
         """
         
         self.terminal = terminal
-        if isinstance(terminal, StrategyTester):
-            self.terminal = terminal.mt5_instance
 
         self._position: Optional[Any] = position
         
