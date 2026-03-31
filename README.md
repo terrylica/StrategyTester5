@@ -1,6 +1,6 @@
 ## What is StrategyTester5?
 
-The Full documentation is found here: [strategytester5.com](strategytester5.com)
+The Full documentation is found here: [strategytester5.com](https://strategytester5.com)
 
 StrategyTester5 (ST5) is a Python framework for building, testing, and optimizing algorithmic trading strategies using the MetaTrader 5 platform.
 
