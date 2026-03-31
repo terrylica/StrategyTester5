@@ -47,7 +47,7 @@ class StrategyTester:
                  trading_history_dir: Optional[str] = "TradingHistory",
                  polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto"):
 
-        """Instanciates the StrategyTester with the given configuration, sets up the simulated MetaTrader5 environment, and prepares for running the backtest.
+        """Instantiates the StrategyTester with the given configuration, sets up the simulated MetaTrader5 environment, and prepares for running the backtest.
 
         Args:
             tester_config (dict): Dictionary of tester configuration values.

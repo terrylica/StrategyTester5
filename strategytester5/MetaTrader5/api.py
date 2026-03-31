@@ -306,6 +306,9 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         return rates
 
+    def symbol_select(self, symbol: str, select: bool=False) -> bool:
+        return True
+
     def copy_ticks_range(self, symbol: str, date_from: datetime, date_to: datetime,
                          flags: int = MetaTrader5.COPY_TICKS_ALL) -> Optional[TICKS_DTYPE]:
 
