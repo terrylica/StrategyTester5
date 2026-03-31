@@ -1,0 +1,122 @@
+site_name: STRATEGYTESTER5
+site_url: https://strategytester5.com
+
+theme:
+  logo: images/five.svg
+  name: material
+  custom_dir: docs/overrides
+  favicon: images/favicon.png
+
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.top
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.instant.prefetch
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+    - search.share
+    - announce.dismiss
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: installation.md
+      - Quick Start | Make your first Bot: quickstart.md
+  - Documentation: 
+      - Overview: documentation/index.md
+      - Working With Indicators: documentation/working_with_indicators.md
+      - RSI Strategy Example: documentation/rsi_strategy.md
+      - Logging and Debugging: documentation/logging_debugging.md
+  - Tutorials: tutorials.md
+
+  - API Reference: 
+      - Overview: api/index.md
+      - MetaTrader5: 
+        - API: api/metatrader5/api.md
+        - Constants: api/metatrader5/constants.md
+        - Data: api/metatrader5/data.md
+        - Trade Validators: api/metatrader5/validators.md
+      - Trade Classes:
+        - Account Info: api/trade_classes/accountinfo.md
+        - Deal Info: api/trade_classes/dealinfo.md
+        - History Order Info: api/trade_classes/historyorderinfo.md
+        - Order Info: api/trade_classes/orderinfo.md
+        - Position Info: api/trade_classes/positioninfo.md
+        - Symbol Info: api/trade_classes/symbolinfo.md
+        - Terminal Info: api/trade_classes/terminalinfo.md
+        - Trade: api/trade_classes/trade.md
+      - strategytester5:
+        - Configurations: api/strategytester5/config.md
+        - Tester config validators: api/strategytester5/config_validators.md
+        - Tester Stats: api/strategytester5/stats.md
+        - Tester: api/strategytester5/tester.md
+
+  # - FAQ: faq.md
+  - About: about.md
+
+plugins:
+  - mkdocstrings 
+  - search 
+  - privacy:
+      enabled: true
+      cache: true
+      cache_dir: .cache/plugins/privacy
+      log: true
+      assets: true
+      assets_fetch: true
+      assets_fetch_dir: assets/external
+      links: true
+      links_noopener: true
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  
+
+repo_url: https://github.com/MegaJoctan/StrategyTester5
+
+extra:
+  social:
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/omega-joctan-34a671206/
+    - icon: fontawesome/brands/youtube
+      link: https://www.youtube.com/@omegafx-co
+    - icon: fontawesome/brands/telegram
+      link: https://t.me/omegafx_co
+
+  consent:
+    title: Cookie consent
+    actions:
+      - accept
+      - manage
+    description: >- 
+      We use cookies to recognize your repeated visits and preferences, as well
+      as to measure the effectiveness of our documentation and whether users
+      find what they're searching for. With your consent, you're helping us to
+      make our documentation better.
+    
+copyright: >
+  © 2026 Omega Joctan — StrategyTester5. All rights reserved.
+  <a href="#__consent">Change cookie settings</a>
