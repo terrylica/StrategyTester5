@@ -21,3 +21,6 @@ Logs/
 TradingHistory/
 
 *.html
+
+site/
+.cache/
