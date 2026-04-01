@@ -5,24 +5,46 @@ from typing import Optional, Literal, Union, Any
 from strategytester5.MetaTrader5.constants import MetaTrader5Constants
 from strategytester5.MetaTrader5.constants import MetaTrader5Constants as MetaTrader5
 import logging
-from datetime import datetime, timedelta
-from ..MQL5 import functions as mql5
+from datetime import datetime
 from .error_description import return_code_description
 from .trade_validators import TradeValidators
 from strategytester5 import config
 from . import data
 import fnmatch
 from pathlib import Path
-
+from strategytester5.MQL5.functions import PeriodSeconds
+from datetime import datetime, timedelta
 
 class OverLoadedMetaTrader5API(MetaTrader5Constants):
+    """The simulated MetaTrader5 Instance similar to [https://pypi.org/project/metatrader5/](https://pypi.org/project/metatrader5/)"""
+
     def __init__(self,
                  logger: logging.Logger,
                  live_mt5: Any,
+                 history_start_date: datetime,
                  broker_data_path: Optional[str] = config.DEFAULT_BROKER_DATA_PATH,
                  polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto"
                  ):
+        """
+        Instantiates & initializes the simulated MetaTrader5 instance
 
+        Args:
+            logger (logging.Logger): The logger to use. Defaults to None.
+            live_mt5 (Any): MetaTrader5 API/client instance used for obtaining crucial information from the broker as an attempt to mimic the terminal.
+            history_start_date (datetime | optional): The first date in history
+            broker_data_path (str | optional): A folder to store broker's credentials after extracting from MetaTrader5
+
+            polars_collect_engine (str): Engine used by Polars when collecting historical data in functions for obtaining ticks — copy_ticks*, and bars information/rates (copy_rates*). Supported values are:
+                - ``"auto"`` (default): Use Polars’ standard in-memory engine and
+                    respect the ``POLARS_ENGINE_AFFINITY`` environment variable if set.
+                - ``"in-memory"``: Explicitly use the default in-memory engine,
+                    optimized with multi-threading and SIMD over Arrow data.
+                - ``"streaming"``: Process queries in batches, enabling
+                    larger-than-RAM datasets.
+                - ``"gpu"``: Use NVIDIA GPUs via RAPIDS cuDF for accelerated execution.
+                    Requires installing Polars with GPU support, e.g.:
+                    ``pip install polars[gpu] --extra-index-url=https://pypi.nvidia.com``.
+        """
         super().__init__()
 
         self.ac_info_json = Path(broker_data_path) / config.DEFAULT_ACCOUNT_INFO_JSON
@@ -58,6 +80,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
             data.export_terminal_info(terminal_info, self.terminal_info_json)
 
+        self.history_start_date = history_start_date
         self.logger = logger
         self.broker_data_path = broker_data_path
         self.polars_collect_engine = polars_collect_engine
@@ -244,11 +267,10 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
         [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesfrom_py)
 
         Args:
-            symbol: Financial instrument name, for example, "EURUSD". Required unnamed parameter.
-            timeframe: Timeframe the bars are requested for. Set by a value from the TIMEFRAME enumeration. Required unnamed parameter.
-            date_from: Date of opening of the first bar from the requested sample. Set by the 'datetime' object or as a number of seconds elapsed since 1970.01.01. Required unnamed parameter.
-
-            count: Number of bars to receive. Required unnamed parameter.
+            symbol (str): Financial instrument name, for example, "EURUSD". Required unnamed parameter.
+            timeframe (int): Timeframe the bars are requested for. Set by a value from the TIMEFRAME enumeration. Required unnamed parameter.
+            date_from (datetime): Date of opening of the first bar from the requested sample. Set by the 'datetime' object or as a number of seconds elapsed since 1970.01.01. Required unnamed parameter.
+            count (int): Number of bars to receive. Required unnamed parameter.
 
         Returns:
             Returns bars as the numpy array with the named time, open, high, low, close, tick_volume, spread and real_volume columns. Return None in case of an error. The info on the error can be obtained using last_error().
@@ -259,8 +281,8 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         # instead of getting data from MetaTrader 5, get data stored in our custom directories
 
-        date_to = date_from + timedelta(seconds=mql5.PeriodSeconds(timeframe) * count)
-        rates = self.copy_rates_range(symbol=symbol, timeframe=timeframe, date_from=date_from, date_to=date_to)
+        rates = self.history_manager.copy_rates_from_parquet(symbol, timeframe, date_from=date_from, history_start_date=self.history_start_date, count=count,
+                                                             broker_data_dir=self.broker_data_path, logger=self.logger, polars_collect_engine=self.polars_collect_engine)
 
         if rates is None or len(rates) == 0:
             self.logger.warning(f"no rates found for {symbol} from {date_from} bars: {count}")
@@ -274,7 +296,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         [Reference](https://www.mql5.com/en/docs/python_metatrader5/mt5copyratesfrompos_py)
 
-        Parameters:
+        Args:
             symbol (str): Financial instrument name, for example, "EURUSD". Required unnamed parameter.
             timeframe (int): MT5 timeframe the bars are requested for.
             start_pos (int): Initial index of the bar the data are requested from. The numbering of bars goes from present to past. Thus, the zero bar means the current one. Required unnamed parameter.
@@ -291,14 +313,15 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
                 f"Time information not found in the ticker for {symbol}, call the function 'tick_update' giving it the latest tick information")
             return None
 
-        now = tick.time
-
-        date_from = now
-        if isinstance(now, int) or isinstance(now, float):
-            date_from = datetime.fromtimestamp(now)
-
-        date_from += timedelta(seconds=mql5.PeriodSeconds(timeframe) * start_pos)
-        rates = self.copy_rates_from(symbol=symbol, timeframe=timeframe, date_from=date_from, count=count)
+        now = datetime.fromtimestamp(tick.time)
+        rates = self.history_manager.copy_rates_from_parquet(symbol,
+                                                             timeframe,
+                                                             date_from=now,
+                                                             history_start_date=self.history_start_date,
+                                                             count=count,
+                                                             broker_data_dir=self.broker_data_path,
+                                                             logger=self.logger,
+                                                             polars_collect_engine=self.polars_collect_engine)
 
         if rates is None or len(rates) == 0:
             self.logger.warning(f"no rates found for {symbol} from {start_pos} bars: {count}")
@@ -309,7 +332,10 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
     def symbol_select(self, symbol: str, select: bool=False) -> bool:
         return True
 
-    def copy_ticks_range(self, symbol: str, date_from: datetime, date_to: datetime,
+    def copy_ticks_range(self,
+                         symbol: str,
+                         date_from: datetime,
+                         date_to: datetime,
                          flags: int = MetaTrader5.COPY_TICKS_ALL) -> Optional[TICKS_DTYPE]:
 
         """Get ticks for the specified date range from the MetaTrader 5 terminal.
@@ -363,6 +389,7 @@ class OverLoadedMetaTrader5API(MetaTrader5Constants):
 
         return self.history_manager.copy_ticks_range_from_parquet(symbol=symbol,
                                                                   date_from=date_from,
+                                                                  date_to=self.history_start_date,
                                                                   limit=count,
                                                                   polars_collect_engine=self.polars_collect_engine,
                                                                   broker_data_dir=self.broker_data_path,
