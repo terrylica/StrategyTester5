@@ -1,93 +1,56 @@
-from strategytester5.hist.manager import HistoryManager
-from strategytester5.validators.tester_configs import TesterConfigValidators
-from strategytester5 import get_logger, logging, STRING2TIMEFRAME_MAP
+from strategytester5.MetaTrader5.data import HistoryManager
+import MetaTrader5 as mt5
+from datetime import datetime, timedelta, timezone
+import pandas as pd
 
-history_dir = r'D:\StrategyTester5\examples\simple trading bot\History'
-    
-if __name__ == "__main__":
+start_dt = datetime(2026, 1, 2, hour=0, minute=0)
+count = 200
 
-    tester_config: dict = {
-        "bot_name": "test EA",
-        "deposit": 1000,
-        "leverage": "1:100",
-        "timeframe": "H1",
-        "start_date": "01.12.2025 00:00",
-        "end_date": "31.12.2025 00:00",
-        "modelling": "every_tick",
-        # "modelling": "new_bar",
-        "symbols": ["EURUSD", "GBPUSD", "USDCAD"]
-    }
+end_dt = start_dt - timedelta(hours=count)
 
-    tester_config = TesterConfigValidators.parse_tester_configs(tester_config)
-        
-    start_dt = tester_config["start_date"]
-    end_dt   = tester_config["end_date"]
-    symbols = tester_config["symbols"]
-    timeframe = tester_config["timeframe"]
-    modelling = tester_config["modelling"]
+rates = HistoryManager.copy_rates_from_parquet("EURUSD", timeframe=mt5.TIMEFRAME_H1, date_from=start_dt, history_start_date=end_dt, count=count,
+                                               broker_data_dir="ICMarketsSC-Demo")
+rates_df = pd.DataFrame(rates)
+rates_df["time"] = pd.to_datetime(rates_df["time"], unit="s", utc=True)
 
+print("from parquet: ",rates_df.head(-10))
+print(rates_df.shape)
 
-    import MetaTrader5 as mt5
+if not mt5.initialize():
+    raise RuntimeError("Failed to Initialize MetaTrader5")
 
+rates = mt5.copy_rates_from("EURUSD", mt5.TIMEFRAME_H1, start_dt, count)
+if rates is None:
+    print("no data returned from MT5")
 
-    if not mt5.initialize():
-        print("Failed to initialize MetaTrader5, Error = ", mt5.last_error())
-        quit()
+rates_df = pd.DataFrame(rates)
+rates_df["time"] = pd.to_datetime(rates_df["time"], unit="s", utc=True)
 
-    import strategytester5.hist.bars as bars
-    import strategytester5.hist.ticks as ticks
-
-    logger = get_logger("test",
-                         logfile= f"test.log",
-                         level=logging.DEBUG)
-
-    bars_df = bars.get_bars_from_mt5(
-        which_mt5=mt5,
-        symbol=symbols[0],
-        timeframe=timeframe,
-        start_datetime=start_dt,
-        end_datetime=end_dt,
-        logger=logger,
-        hist_dir=history_dir,
-        return_df=True
-    )
-
-    print("Bars from MT5\n",bars_df.head(-10))
-
-    bars_df = bars.get_bars_from_history(
-        symbol=symbols[0],
-        timeframe=timeframe,
-        start_datetime=start_dt,
-        end_datetime=end_dt,
-        POLARS_COLLECT_ENGINE="auto",
-        logger=logger,
-        hist_dir=history_dir
-    )
-
-    print("Bars from History\n", bars_df.head(-10))
+print("from MT5: ",rates_df.head(-10))
+print(rates_df.shape)
 
 
-    # --------------------------- ticks -----------------------------
+"""
+start_dt = datetime(2026, 2, 1, hour=0, minute=0)
+count = 200
 
-    ticks_df = ticks.get_ticks_from_mt5(
-        which_mt5=mt5,
-        symbol=symbols[0],
-        start_datetime=start_dt,
-        end_datetime=end_dt,
-        logger=logger,
-        hist_dir=history_dir,
-        return_df=True
-    )
+end_dt = start_dt + timedelta(hours=count)
 
-    print("Ticks from MT5\n",ticks_df.head(-10))
+rates = HistoryManager.copy_rates_range_from_parquet("EURUSD", timeframe=mt5.TIMEFRAME_H1, date_from=start_dt, date_to=end_dt, broker_data_dir="ICMarketsSC-Demo")
+rates_df = pd.DataFrame(rates)
+rates_df["time"] = pd.to_datetime(rates_df["time"], unit="s", utc=True)
 
-    ticks_df = ticks.get_ticks_from_history(
-        symbol=symbols[0],
-        start_datetime=start_dt,
-        end_datetime=end_dt,
-        POLARS_COLLECT_ENGINE="auto",
-        logger=logger,
-        hist_dir=history_dir
-    )
+print("from parquet: ",rates_df.head(-10))
 
-    print("Ticks from History\n", ticks_df.head(-10))
+if not mt5.initialize():
+    raise RuntimeError("Failed to Initialize MetaTrader5")
+
+rates = mt5.copy_rates_range("EURUSD", mt5.TIMEFRAME_H1, start_dt, end_dt)
+if rates is None:
+    print("no data returned from MT5")
+
+rates_df = pd.DataFrame(rates)
+rates_df["time"] = pd.to_datetime(rates_df["time"], unit="s", utc=True)
+
+print("from MT5: ",rates_df.head(-10))
+"""
