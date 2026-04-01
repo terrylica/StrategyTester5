@@ -373,6 +373,116 @@ class HistoryManager:
             return None
 
     @staticmethod
+    def copy_rates_from_parquet(
+            symbol: str,
+            timeframe: int,
+            date_from: datetime,
+            history_start_date: datetime,
+            count: int,
+            polars_collect_engine: Literal["auto", "in-memory", "streaming", "gpu"] = "auto",
+            broker_data_dir: Optional[str] = config.DEFAULT_BROKER_DATA_PATH,
+            logger: Optional[logging.Logger] = None
+    ):
+        """Copies bars (rates) for a specified symbol, timeframe and date range from locally stored parquet files. This method is used by the simulator to load bars without accessing the MetaTrader5 terminal.
+
+        Args:
+            symbol (str): An instrument in the terminal
+            timeframe (int): A timeframe to extract bars from
+            date_from (datetime): start date of the bars to copy
+            history_start_date (datetime): The first date in history
+            count (int | optional): The maximum number of ticks to collect
+            polars_collect_engine (Literal["auto", "in-memory", "streaming", "gpu"], optional): Polars collection engine to use. Defaults to "auto".
+            broker_data_dir (Optional[str], optional): The directory where broker data is stored. Defaults to config.DEFAULT_BROKER_DATA_PATH.
+            logger (Optional[logging.Logger], optional): The logger to use. Defaults to None.
+
+        Returns:
+            Copied bars as a NumPy array or None in case of a failure
+        """
+
+        timeframe_str = MetaTrader5Constants.TIMEFRAME2STRING_MAP[timeframe]
+
+        # ---------------- determine months ----------------
+
+        start_dt = min(date_from, history_start_date)
+        end_dt = max(date_from, history_start_date)
+
+        months_iter = (HistoryManager.iter_months_between(start_dt, end_dt))
+
+        files: list[str] = []
+        for year, month in months_iter:
+            file = HistoryManager.bars_file_path(
+                symbol=symbol,
+                timeframe_str=timeframe_str,
+                year=year,
+                month=month,
+                broker_data_dir=broker_data_dir
+            )
+
+            if file.exists():
+                files.append(str(file))
+            else:
+                _warning_log(f"{file} not found, skipping", logger)
+
+        if not files:
+            _warning_log(
+                f"No stored bar history found for {symbol} {timeframe_str} searched paths: {files}",
+                logger
+            )
+            return None
+
+        t_from = int(date_from.timestamp())
+        try:
+            lf = pl.scan_parquet(files)
+
+            # ---------------- sorting ----------------
+
+            lf = lf.filter(pl.col("time") <= t_from)
+            lf = lf.sort("time", descending=True)
+            lf = lf.limit(count)
+
+            df = (
+                lf.select([
+                    "time",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "tick_volume",
+                    "spread",
+                    "real_volume",
+                ])
+                .collect(engine=polars_collect_engine)
+            )
+
+            if df.is_empty():
+                return np.empty(0, dtype=RATES_DTYPE)
+
+            # ---------------- convert ----------------
+            arr = np.array(
+                list(zip(
+                    df["time"],
+                    df["open"],
+                    df["high"],
+                    df["low"],
+                    df["close"],
+                    df["tick_volume"],
+                    df["spread"],
+                    df["real_volume"],
+                )),
+                dtype=RATES_DTYPE
+            )
+
+            return arr[::-1]
+
+        except Exception as e:
+            _warning_log(
+                f"Failed to copy stored rates for {symbol} {timeframe_str} "
+                f"from {date_from}: {e}",
+                logger
+            )
+            return None
+
+    @staticmethod
     def _tick_flag_mask(flags: int) -> int:
         if flags == MetaTrader5Constants.COPY_TICKS_ALL:
             return (
