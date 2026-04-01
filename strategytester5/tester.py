@@ -51,11 +51,8 @@ class StrategyTester:
 
         Args:
             tester_config (dict): Dictionary of tester configuration values.
-
             mt5_instance (MetaTrader5): MetaTrader5 API/client instance used for obtaining crucial information from the broker as an attempt to mimic the terminal.
-
             logging_level: Minimum severity of messages to record. Uses standard `logging` levels (e.g., logging.DEBUG, INFO, WARNING, ERROR, CRITICAL). Messages below this level are ignored.
-
             logs_dir (str): Directory for log files.
             reports_dir (str): Directory for HTML reports and assets.
             history_dir (str): Directory for historical data storage.
@@ -98,13 +95,15 @@ class StrategyTester:
                 "Fatal, A live MetaTrader5 Instance isn't given. If you haven't installed it (WINDOWS-ONLY) run `pip install metatrader5`")
 
         self.broker_data_dir = self.live_mt5_instance.account_info().server
-        self.simulated_mt5 = OverLoadedMetaTrader5API(logger=self.logger,
-                                                      broker_data_path=self.broker_data_dir,
-                                                      polars_collect_engine=polars_collect_engine,
-                                                      live_mt5=self.live_mt5_instance)
 
         start_dt = self.tester_config.get("start_date", 0)
         start_dt_ts = start_dt.timestamp() if isinstance(start_dt, datetime) else start_dt
+
+        self.simulated_mt5 = OverLoadedMetaTrader5API(logger=self.logger,
+                                                      broker_data_path=self.broker_data_dir,
+                                                      polars_collect_engine=polars_collect_engine,
+                                                      history_start_date=start_dt,
+                                                      live_mt5=self.live_mt5_instance)
 
         self.simulated_mt5._current_time = start_dt_ts
         self.simulated_mt5._current_time_msc = start_dt_ts * 1000
